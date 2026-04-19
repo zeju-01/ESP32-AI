@@ -269,7 +269,7 @@ void RobotFace::SetImageEmotion(const char* emotion) {
     if (images.eye_left) {
         lv_image_set_src(left_eye_img_, images.eye_left);
         lv_obj_remove_flag(left_eye_img_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align(left_eye_img_, LV_ALIGN_CENTER, -bg_width_ / 3.5, -bg_height_ / 12);
+        lv_obj_align(left_eye_img_, LV_ALIGN_CENTER, -bg_width_ / 4, -bg_height_ / 12);
         lv_obj_move_foreground(left_eye_img_);
     } else {
         lv_obj_add_flag(left_eye_img_, LV_OBJ_FLAG_HIDDEN);
@@ -278,7 +278,7 @@ void RobotFace::SetImageEmotion(const char* emotion) {
     if (images.eye_right) {
         lv_image_set_src(right_eye_img_, images.eye_right);
         lv_obj_remove_flag(right_eye_img_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align(right_eye_img_, LV_ALIGN_CENTER, bg_width_ / 3.5, -bg_height_ / 12);
+        lv_obj_align(right_eye_img_, LV_ALIGN_CENTER, bg_width_ / 4, -bg_height_ / 12);
         lv_obj_move_foreground(right_eye_img_);
     } else {
         lv_obj_add_flag(right_eye_img_, LV_OBJ_FLAG_HIDDEN);
@@ -296,7 +296,7 @@ void RobotFace::SetImageEmotion(const char* emotion) {
     if (images.blush_left) {
         lv_image_set_src(blush_left_img_, images.blush_left);
         lv_obj_remove_flag(blush_left_img_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align(blush_left_img_, LV_ALIGN_CENTER, -bg_width_ / 2.8, bg_height_ / 9);
+        lv_obj_align(blush_left_img_, LV_ALIGN_CENTER, -bg_width_ / 2.8, bg_height_ / 6);
     } else {
         lv_obj_add_flag(blush_left_img_, LV_OBJ_FLAG_HIDDEN);
     }
@@ -304,7 +304,7 @@ void RobotFace::SetImageEmotion(const char* emotion) {
     if (images.blush_right) {
         lv_image_set_src(blush_right_img_, images.blush_right);
         lv_obj_remove_flag(blush_right_img_, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align(blush_right_img_, LV_ALIGN_CENTER, bg_width_ / 2.8, bg_height_ / 9);
+        lv_obj_align(blush_right_img_, LV_ALIGN_CENTER, bg_width_ / 2.8, bg_height_ / 6);
     } else {
         lv_obj_add_flag(blush_right_img_, LV_OBJ_FLAG_HIDDEN);
     }
