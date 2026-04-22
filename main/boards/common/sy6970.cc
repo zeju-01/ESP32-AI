@@ -3,6 +3,7 @@
 #include "display.h"
 
 #include <esp_log.h>
+#include <esp_err.h>
 
 #define TAG "Sy6970"
 
@@ -10,7 +11,13 @@ Sy6970::Sy6970(i2c_master_bus_handle_t i2c_bus, uint8_t addr) : I2cDevice(i2c_bu
 }
 
 int Sy6970::GetChangingStatus() {
-    return (ReadReg(0x0B) >> 3) & 0x03;
+    uint8_t value = 0;
+    esp_err_t ret = ReadReg(0x0B, value);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read charging status: %s", esp_err_to_name(ret));
+        return 0;
+    }
+    return (value >> 3) & 0x03;
 }
 
 bool Sy6970::IsCharging() {
@@ -18,7 +25,13 @@ bool Sy6970::IsCharging() {
 }
 
 bool Sy6970::IsPowerGood() {
-    return (ReadReg(0x0B) & 0x04) != 0;
+    uint8_t value = 0;
+    esp_err_t ret = ReadReg(0x0B, value);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read power good status: %s", esp_err_to_name(ret));
+        return false;
+    }
+    return (value & 0x04) != 0;
 }
 
 bool Sy6970::IsChargingDone() {
@@ -26,7 +39,12 @@ bool Sy6970::IsChargingDone() {
 }
 
 int Sy6970::GetBatteryVoltage() {
-    uint8_t value = ReadReg(0x0E);
+    uint8_t value = 0;
+    esp_err_t ret = ReadReg(0x0E, value);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read battery voltage: %s", esp_err_to_name(ret));
+        return 0;
+    }
     value &= 0x7F;
     if (value == 0) {
         return 0;
@@ -35,7 +53,12 @@ int Sy6970::GetBatteryVoltage() {
 }
 
 int Sy6970::GetChargeTargetVoltage() {
-    uint8_t value = ReadReg(0x06);
+    uint8_t value = 0;
+    esp_err_t ret = ReadReg(0x06, value);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read charge target voltage: %s", esp_err_to_name(ret));
+        return 0;
+    }
     value = (value & 0xFC) >> 2;
     if (value > 0x30) {
         return 4608;

@@ -9,6 +9,8 @@
 #include "lamp_controller.h"
 #include "led/single_led.h"
 #include "esp32_camera.h"
+#include "mpu6050_app.h"
+#include "sht30_app.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
@@ -61,11 +63,14 @@ static const gc9a01_lcd_init_cmd_t gc9107_lcd_init_cmds[] = {
 #define TAG "CompactWifiBoardS3Cam"
 
 class CompactWifiBoardS3Cam : public WifiBoard {
-private:
- 
+private: 
+
     Button boot_button_;
     LcdDisplay* display_;
     Esp32Camera* camera_;
+    i2c_master_bus_handle_t i2c_bus_;
+    Mpu6050App* mpu6050_app_;
+    Sht30App* sht30_app_;
 
     void InitializeSpi() {
         spi_bus_config_t buscfg = {};
@@ -165,13 +170,58 @@ private:
         });
     }
 
+    void InitializeI2c() {
+        // 使用与摄像头相同的I2C总线（GPIO 4和5）
+        i2c_master_bus_config_t i2c_bus_cfg = {
+            .i2c_port = I2C_NUM_0,
+            .sda_io_num = GPIO_NUM_4,
+            .scl_io_num = GPIO_NUM_5,
+            .clk_source = I2C_CLK_SRC_DEFAULT,
+            .glitch_ignore_cnt = 7,
+            .intr_priority = 0,
+            .trans_queue_depth = 0,
+            .flags = {
+                .enable_internal_pullup = 1,
+            },
+        };
+        esp_err_t ret = i2c_new_master_bus(&i2c_bus_cfg, &i2c_bus_);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create I2C bus: %s", esp_err_to_name(ret));
+            return;
+        }
+
+        // 初始化MPU6050加速度陀螺仪传感器（地址位接VCC，地址为0x69）
+        mpu6050_app_ = new Mpu6050App(i2c_bus_);
+        if (mpu6050_app_->Initialize()) {
+            ESP_LOGI(TAG, "MPU6050 initialized successfully");
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize MPU6050, continuing without it");
+            delete mpu6050_app_;
+            mpu6050_app_ = nullptr;
+        }
+
+        // 初始化SHT30温湿度传感器
+        sht30_app_ = new Sht30App(i2c_bus_);
+        if (sht30_app_->Initialize()) {
+            ESP_LOGI(TAG, "SHT30 initialized successfully");
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize SHT30, continuing without it");
+            delete sht30_app_;
+            sht30_app_ = nullptr;
+        }
+    }
+
 public:
     CompactWifiBoardS3Cam() :
-        boot_button_(BOOT_BUTTON_GPIO) {
+        boot_button_(BOOT_BUTTON_GPIO),
+        i2c_bus_(nullptr),
+        mpu6050_app_(nullptr),
+        sht30_app_(nullptr) {
         InitializeSpi();
         InitializeLcdDisplay();
         InitializeButtons();
         InitializeCamera();
+        InitializeI2c();
         if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
             GetBacklight()->RestoreBrightness();
         }
@@ -208,6 +258,43 @@ public:
 
     virtual Camera* GetCamera() override {
         return camera_;
+    }
+
+    void UpdateSensors() {
+        if (mpu6050_app_) {
+            mpu6050_app_->Update();
+        }
+        if (sht30_app_) {
+            sht30_app_->Update();
+            sht30_app_->PrintData();
+            
+            auto display = GetDisplay();
+            if (display) {
+                display->SetTemperatureHumidity(sht30_app_->GetTemperature(), sht30_app_->GetHumidity());
+            }
+        }
+    }
+
+    void UpdateSensorsSafe() {
+        // Safe update method that checks all pointers before access
+        auto display = GetDisplay();
+        if (sht30_app_ != nullptr) {
+            sht30_app_->Update();
+            sht30_app_->PrintData();
+            
+            if (display != nullptr) {
+                display->SetTemperatureHumidity(sht30_app_->GetTemperature(), sht30_app_->GetHumidity());
+            }
+        }
+        // MPU6050暂时禁用
+    }
+
+    Mpu6050App* GetMpu6050App() {
+        return mpu6050_app_;
+    }
+
+    Sht30App* GetSht30App() {
+        return sht30_app_;
     }
 };
 

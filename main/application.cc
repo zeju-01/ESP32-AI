@@ -249,6 +249,8 @@ void Application::Run() {
             clock_ticks_++;
             auto display = Board::GetInstance().GetDisplay();
             display->UpdateStatusBar();
+            
+            Board::GetInstance().UpdateSensors();
         
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {

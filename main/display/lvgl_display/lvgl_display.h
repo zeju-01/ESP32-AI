@@ -25,6 +25,9 @@ public:
     virtual void SetPowerSaveMode(bool on);
     virtual bool SnapshotToJpeg(std::string& jpeg_data, int quality = 80);
 
+    void SetTemperatureHumidity(float temperature, float humidity);
+    void SetMpu6050Data(float pitch, float roll, float yaw);
+
 protected:
     esp_pm_lock_handle_t pm_lock_ = nullptr;
     lv_display_t *display_ = nullptr;
@@ -36,6 +39,9 @@ protected:
     lv_obj_t *battery_label_ = nullptr;
     lv_obj_t* low_battery_popup_ = nullptr;
     lv_obj_t* low_battery_label_ = nullptr;
+    lv_obj_t* temperature_label_ = nullptr;
+    lv_obj_t* humidity_label_ = nullptr;
+    lv_obj_t* mpu6050_label_ = nullptr;
     
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;

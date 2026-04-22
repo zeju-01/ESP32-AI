@@ -23,6 +23,8 @@ protected:
     lv_draw_buf_t draw_buf_;
     lv_obj_t* top_bar_ = nullptr;
     lv_obj_t* status_bar_ = nullptr;
+    lv_obj_t* temp_humidity_bar_ = nullptr;
+    lv_obj_t* mpu6050_bar_ = nullptr;
     lv_obj_t* content_ = nullptr;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
@@ -30,6 +32,7 @@ protected:
     lv_obj_t* preview_image_ = nullptr;
     lv_obj_t* emoji_label_ = nullptr;
     lv_obj_t* emoji_image_ = nullptr;
+    lv_obj_t* mpu6050_label_ = nullptr;
     std::unique_ptr<LvglGif> gif_controller_ = nullptr;
     std::unique_ptr<RobotFace> robot_face_ = nullptr;
     lv_obj_t* emoji_box_ = nullptr;

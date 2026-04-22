@@ -64,6 +64,12 @@ LvglDisplay::~LvglDisplay() {
     if( low_battery_popup_ != nullptr ) {
         lv_obj_del(low_battery_popup_);
     }
+    if (temperature_label_ != nullptr) {
+        lv_obj_del(temperature_label_);
+    }
+    if (humidity_label_ != nullptr) {
+        lv_obj_del(humidity_label_);
+    }
     if (pm_lock_ != nullptr) {
         esp_pm_lock_delete(pm_lock_);
     }
@@ -219,6 +225,40 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
 }
 
 void LvglDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
+}
+
+void LvglDisplay::SetTemperatureHumidity(float temperature, float humidity) {
+    ESP_LOGI("LvglDisplay", "SetTemperatureHumidity called: %.1fC, %.1f%%", temperature, humidity);
+    DisplayLockGuard lock(this);
+    if (temperature_label_ != nullptr) {
+        char temp_str[32];
+        snprintf(temp_str, sizeof(temp_str), "%.1fC", temperature);
+        lv_label_set_text(temperature_label_, temp_str);
+        ESP_LOGI("LvglDisplay", "Temperature label updated: %s", temp_str);
+    } else {
+        ESP_LOGW("LvglDisplay", "Temperature label is null");
+    }
+    if (humidity_label_ != nullptr) {
+        char hum_str[32];
+        snprintf(hum_str, sizeof(hum_str), "%.1f%%", humidity);
+        lv_label_set_text(humidity_label_, hum_str);
+        ESP_LOGI("LvglDisplay", "Humidity label updated: %s", hum_str);
+    } else {
+        ESP_LOGW("LvglDisplay", "Humidity label is null");
+    }
+}
+
+void LvglDisplay::SetMpu6050Data(float pitch, float roll, float yaw) {
+    ESP_LOGI("LvglDisplay", "SetMpu6050Data called: Pitch=%.1f, Roll=%.1f, Yaw=%.1f", pitch, roll, yaw);
+    DisplayLockGuard lock(this);
+    if (mpu6050_label_ != nullptr) {
+        char mpu_str[64];
+        snprintf(mpu_str, sizeof(mpu_str), "Pitch:%.1f Roll:%.1f Yaw:%.1f", pitch, roll, yaw);
+        lv_label_set_text(mpu6050_label_, mpu_str);
+        ESP_LOGI("LvglDisplay", "MPU6050 label updated: %s", mpu_str);
+    } else {
+        ESP_LOGW("LvglDisplay", "MPU6050 label is null");
+    }
 }
 
 void LvglDisplay::SetPowerSaveMode(bool on) {

@@ -318,6 +318,12 @@ LcdDisplay::~LcdDisplay() {
     if (bottom_bar_ != nullptr) {
         lv_obj_del(bottom_bar_);
     }
+    if (temp_humidity_bar_ != nullptr) {
+        lv_obj_del(temp_humidity_bar_);
+    }
+    if (mpu6050_bar_ != nullptr) {
+        lv_obj_del(mpu6050_bar_);
+    }
     if (status_bar_ != nullptr) {
         lv_obj_del(status_bar_);
     }
@@ -412,6 +418,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_pad_all(right_icons, 0, 0);
     lv_obj_set_flex_flow(right_icons, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(right_icons, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_grow(right_icons, 1);  // 允许容器增长以占据右侧空间
 
     mute_label_ = lv_label_create(right_icons);
     lv_label_set_text(mute_label_, "");
@@ -423,6 +430,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(battery_label_, icon_font, 0);
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_margin_left(battery_label_, lvgl_theme->spacing(2), 0);
+
+
 
     /* Layer 2: Status bar - for center text labels */
     status_bar_ = lv_obj_create(screen);
@@ -436,6 +445,53 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_scrollbar_mode(status_bar_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_layout(status_bar_, LV_LAYOUT_NONE, 0);  // Use absolute positioning
     lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, 0);  // Overlap with top_bar_
+    
+    /* Layer 3: Temperature and humidity bar - below status bar */
+    temp_humidity_bar_ = lv_obj_create(screen);
+    lv_obj_set_size(temp_humidity_bar_, LV_HOR_RES, LV_SIZE_CONTENT);
+    lv_obj_set_style_radius(temp_humidity_bar_, 0, 0);
+    lv_obj_set_style_bg_opa(temp_humidity_bar_, LV_OPA_TRANSP, 0);  // Transparent background
+    lv_obj_set_style_border_width(temp_humidity_bar_, 0, 0);
+    lv_obj_set_style_pad_all(temp_humidity_bar_, 0, 0);
+    lv_obj_set_style_pad_top(temp_humidity_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_style_pad_bottom(temp_humidity_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_scrollbar_mode(temp_humidity_bar_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_flex_flow(temp_humidity_bar_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(temp_humidity_bar_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(temp_humidity_bar_, LV_ALIGN_TOP_MID, 0, 30);  // Position below status bar
+    
+    // 温湿度标签 - 使用文本字体
+    temperature_label_ = lv_label_create(temp_humidity_bar_);
+    lv_label_set_text(temperature_label_, "--C");
+    lv_obj_set_style_text_font(temperature_label_, text_font, 0);
+    lv_obj_set_style_text_color(temperature_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_margin_left(temperature_label_, lvgl_theme->spacing(2), 0);
+
+    humidity_label_ = lv_label_create(temp_humidity_bar_);
+    lv_label_set_text(humidity_label_, "--%");
+    lv_obj_set_style_text_font(humidity_label_, text_font, 0);
+    lv_obj_set_style_text_color(humidity_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_margin_left(humidity_label_, lvgl_theme->spacing(2), 0);
+    
+    /* Layer 4: MPU6050 bar - below temperature and humidity bar */
+    mpu6050_bar_ = lv_obj_create(screen);
+    lv_obj_set_size(mpu6050_bar_, LV_HOR_RES, LV_SIZE_CONTENT);
+    lv_obj_set_style_radius(mpu6050_bar_, 0, 0);
+    lv_obj_set_style_bg_opa(mpu6050_bar_, LV_OPA_TRANSP, 0);  // Transparent background
+    lv_obj_set_style_border_width(mpu6050_bar_, 0, 0);
+    lv_obj_set_style_pad_all(mpu6050_bar_, 0, 0);
+    lv_obj_set_style_pad_top(mpu6050_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_style_pad_bottom(mpu6050_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_scrollbar_mode(mpu6050_bar_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_flex_flow(mpu6050_bar_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(mpu6050_bar_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(mpu6050_bar_, LV_ALIGN_TOP_MID, 0, 60);  // Position below temperature and humidity bar
+    
+    // MPU6050标签 - 使用文本字体
+    mpu6050_label_ = lv_label_create(mpu6050_bar_);
+    lv_label_set_text(mpu6050_label_, "Pitch:-- Roll:-- Yaw:--");
+    lv_obj_set_style_text_font(mpu6050_label_, text_font, 0);
+    lv_obj_set_style_text_color(mpu6050_label_, lvgl_theme->text_color(), 0);
 
     notification_label_ = lv_label_create(status_bar_);
     lv_obj_set_width(notification_label_, LV_HOR_RES * 0.8);
@@ -895,6 +951,7 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_pad_all(right_icons, 0, 0);
     lv_obj_set_flex_flow(right_icons, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(right_icons, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_grow(right_icons, 1);  // 允许容器增长以占据右侧空间
 
     mute_label_ = lv_label_create(right_icons);
     lv_label_set_text(mute_label_, "");
@@ -906,6 +963,8 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_style_text_font(battery_label_, icon_font, 0);
     lv_obj_set_style_text_color(battery_label_, lvgl_theme->text_color(), 0);
     lv_obj_set_style_margin_left(battery_label_, lvgl_theme->spacing(2), 0);
+
+
 
     /* Layer 2: Status bar - for center text labels */
     status_bar_ = lv_obj_create(screen);
@@ -919,6 +978,53 @@ void LcdDisplay::SetupUI() {
     lv_obj_set_scrollbar_mode(status_bar_, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_style_layout(status_bar_, LV_LAYOUT_NONE, 0);  // Use absolute positioning
     lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, 0);  // Overlap with top_bar_
+    
+    /* Layer 3: Temperature and humidity bar - below status bar */
+    temp_humidity_bar_ = lv_obj_create(screen);
+    lv_obj_set_size(temp_humidity_bar_, LV_HOR_RES, LV_SIZE_CONTENT);
+    lv_obj_set_style_radius(temp_humidity_bar_, 0, 0);
+    lv_obj_set_style_bg_opa(temp_humidity_bar_, LV_OPA_TRANSP, 0);  // Transparent background
+    lv_obj_set_style_border_width(temp_humidity_bar_, 0, 0);
+    lv_obj_set_style_pad_all(temp_humidity_bar_, 0, 0);
+    lv_obj_set_style_pad_top(temp_humidity_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_style_pad_bottom(temp_humidity_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_scrollbar_mode(temp_humidity_bar_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_flex_flow(temp_humidity_bar_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(temp_humidity_bar_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(temp_humidity_bar_, LV_ALIGN_TOP_MID, 0, 30);  // Position below status bar
+    
+    // 温湿度标签 - 使用文本字体
+    temperature_label_ = lv_label_create(temp_humidity_bar_);
+    lv_label_set_text(temperature_label_, "--C");
+    lv_obj_set_style_text_font(temperature_label_, text_font, 0);
+    lv_obj_set_style_text_color(temperature_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_margin_left(temperature_label_, lvgl_theme->spacing(2), 0);
+
+    humidity_label_ = lv_label_create(temp_humidity_bar_);
+    lv_label_set_text(humidity_label_, "--%");
+    lv_obj_set_style_text_font(humidity_label_, text_font, 0);
+    lv_obj_set_style_text_color(humidity_label_, lvgl_theme->text_color(), 0);
+    lv_obj_set_style_margin_left(humidity_label_, lvgl_theme->spacing(2), 0);
+    
+    /* Layer 4: MPU6050 bar - below temperature and humidity bar */
+    mpu6050_bar_ = lv_obj_create(screen);
+    lv_obj_set_size(mpu6050_bar_, LV_HOR_RES, LV_SIZE_CONTENT);
+    lv_obj_set_style_radius(mpu6050_bar_, 0, 0);
+    lv_obj_set_style_bg_opa(mpu6050_bar_, LV_OPA_TRANSP, 0);  // Transparent background
+    lv_obj_set_style_border_width(mpu6050_bar_, 0, 0);
+    lv_obj_set_style_pad_all(mpu6050_bar_, 0, 0);
+    lv_obj_set_style_pad_top(mpu6050_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_style_pad_bottom(mpu6050_bar_, lvgl_theme->spacing(2), 0);
+    lv_obj_set_scrollbar_mode(mpu6050_bar_, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_flex_flow(mpu6050_bar_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(mpu6050_bar_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(mpu6050_bar_, LV_ALIGN_TOP_MID, 0, 60);  // Position below temperature and humidity bar
+    
+    // MPU6050标签 - 使用文本字体
+    mpu6050_label_ = lv_label_create(mpu6050_bar_);
+    lv_label_set_text(mpu6050_label_, "Pitch:-- Roll:-- Yaw:--");
+    lv_obj_set_style_text_font(mpu6050_label_, text_font, 0);
+    lv_obj_set_style_text_color(mpu6050_label_, lvgl_theme->text_color(), 0);
 
     notification_label_ = lv_label_create(status_bar_);
     lv_obj_set_width(notification_label_, LV_HOR_RES * 0.75);
