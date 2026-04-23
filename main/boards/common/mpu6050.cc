@@ -3,6 +3,8 @@
 #include <esp_log.h>
 #include <esp_err.h>
 #include <esp_timer.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <math.h>
 
 #define TAG "Mpu6050"
@@ -63,15 +65,29 @@ bool Mpu6050::Initialize() {
 
 bool Mpu6050::TestConnection() {
     uint8_t who = 0;
-    esp_err_t ret = ReadReg(WHO_AM_I, who);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to read WHO_AM_I register: %s", esp_err_to_name(ret));
-        return false;
+    ESP_LOGI(TAG, "Testing MPU6050 connection");
+    // 增加重试机制，就像SHT30那样
+    for (int i = 0; i < 3; i++) {
+        esp_err_t ret = ReadReg(WHO_AM_I, who);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "MPU6050 WHO_AM_I = 0x%02X (expected 0x68 or 0x70)", who);
+            // MPU6050的WHO_AM_I通常是0x68，但有些模块可能是0x70
+            // 如果读取到0x68或0x70，说明MPU6050连接正确
+            if (who == 0x68 || who == 0x70) {
+                return true;
+            }
+            ESP_LOGW(TAG, "Unexpected WHO_AM_I value!");
+        } else {
+            ESP_LOGE(TAG, "Attempt %d failed to read WHO_AM_I register: %s", i+1, esp_err_to_name(ret));
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
-    ESP_LOGI(TAG, "MPU6050 WHO_AM_I = 0x%02X (expected 0x68)", who);
-    // 即使WHO_AM_I不匹配，也继续尝试初始化
-    // return (who == 0x68);
-    return true;
+    ESP_LOGE(TAG, "Failed to read WHO_AM_I register after multiple attempts");
+    ESP_LOGE(TAG, "This could mean:");
+    ESP_LOGE(TAG, "  1. MPU6050 is not connected");
+    ESP_LOGE(TAG, "  2. MPU6050 AD0 pin is not correctly connected");
+    ESP_LOGE(TAG, "  3. MPU6050 module is damaged");
+    return false;
 }
 
 void Mpu6050::SetSleep(bool enable) {

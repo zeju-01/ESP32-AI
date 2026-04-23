@@ -27,12 +27,25 @@ Mpu6050App::~Mpu6050App() {
 }
 
 bool Mpu6050App::Initialize() {
-    mpu6050_ = new Mpu6050(i2c_bus_, 0x69);
+    // 首先尝试地址0x68（AD0接GND）
+    mpu6050_ = new Mpu6050(i2c_bus_, 0x68);
     if (!mpu6050_->Initialize()) {
-        ESP_LOGE(TAG, "Failed to initialize MPU6050!");
+        ESP_LOGW(TAG, "Failed to initialize MPU6050 at address 0x68, trying 0x69...");
         delete mpu6050_;
         mpu6050_ = nullptr;
-        return false;
+        
+        // 再尝试地址0x69（AD0接VCC）
+        mpu6050_ = new Mpu6050(i2c_bus_, 0x69);
+        if (!mpu6050_->Initialize()) {
+            ESP_LOGE(TAG, "Failed to initialize MPU6050 at both addresses!");
+            ESP_LOGE(TAG, "Please check:");
+            ESP_LOGE(TAG, "  1. MPU6050 AD0 pin connection (try both GND and VCC)");
+            ESP_LOGE(TAG, "  2. MPU6050 SDA/SCL pins are connected to GPIO 4/5");
+            ESP_LOGE(TAG, "  3. MPU6050 module is not damaged");
+            delete mpu6050_;
+            mpu6050_ = nullptr;
+            return false;
+        }
     }
     ESP_LOGI(TAG, "MPU6050 App initialized successfully");
     return true;

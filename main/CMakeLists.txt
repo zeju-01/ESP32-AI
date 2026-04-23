@@ -56,6 +56,7 @@ list(APPEND SOURCES
     "boards/common/backlight.cc"
     "boards/common/button.cc"
     "boards/common/i2c_device.cc"
+    "boards/common/i2c_scanner.cc"
     "boards/common/mpu6050.cc"
     "boards/common/mpu6050_app.cc"
     "boards/common/sht30.cc"

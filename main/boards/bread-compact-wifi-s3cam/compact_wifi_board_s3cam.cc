@@ -11,6 +11,7 @@
 #include "esp32_camera.h"
 #include "mpu6050_app.h"
 #include "sht30_app.h"
+#include "i2c_scanner.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
@@ -190,6 +191,9 @@ private:
             return;
         }
 
+        // 扫描I2C总线，查看总线上的设备
+        ScanI2cBus(i2c_bus_);
+
         // 初始化MPU6050加速度陀螺仪传感器（地址位接VCC，地址为0x69）
         mpu6050_app_ = new Mpu6050App(i2c_bus_);
         if (mpu6050_app_->Initialize()) {
@@ -261,14 +265,23 @@ public:
     }
 
     void UpdateSensors() {
+        auto display = GetDisplay();
         if (mpu6050_app_) {
             mpu6050_app_->Update();
+            mpu6050_app_->PrintData();
+            
+            if (display) {
+                ESP_LOGI(TAG, "Calling display->SetMpu6050Data with Pitch=%.1f, Roll=%.1f, Yaw=%.1f",
+                         mpu6050_app_->GetPitch(), mpu6050_app_->GetRoll(), mpu6050_app_->GetYaw());
+                display->SetMpu6050Data(mpu6050_app_->GetPitch(), mpu6050_app_->GetRoll(), mpu6050_app_->GetYaw());
+            } else {
+                ESP_LOGW(TAG, "display is nullptr in UpdateSensors!");
+            }
         }
         if (sht30_app_) {
             sht30_app_->Update();
             sht30_app_->PrintData();
             
-            auto display = GetDisplay();
             if (display) {
                 display->SetTemperatureHumidity(sht30_app_->GetTemperature(), sht30_app_->GetHumidity());
             }
@@ -278,6 +291,14 @@ public:
     void UpdateSensorsSafe() {
         // Safe update method that checks all pointers before access
         auto display = GetDisplay();
+        if (mpu6050_app_ != nullptr) {
+            mpu6050_app_->Update();
+            mpu6050_app_->PrintData();
+            
+            if (display != nullptr) {
+                display->SetMpu6050Data(mpu6050_app_->GetPitch(), mpu6050_app_->GetRoll(), mpu6050_app_->GetYaw());
+            }
+        }
         if (sht30_app_ != nullptr) {
             sht30_app_->Update();
             sht30_app_->PrintData();
@@ -286,7 +307,6 @@ public:
                 display->SetTemperatureHumidity(sht30_app_->GetTemperature(), sht30_app_->GetHumidity());
             }
         }
-        // MPU6050暂时禁用
     }
 
     Mpu6050App* GetMpu6050App() {
