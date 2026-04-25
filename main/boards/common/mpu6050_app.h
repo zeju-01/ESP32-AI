@@ -28,6 +28,7 @@ public:
     bool IsShaken() const;
 
     void ResetAngles();
+    const char* GetEmotion();
 
 private:
     i2c_master_bus_handle_t i2c_bus_;

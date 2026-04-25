@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdlib>
 #include <cstring>
+#include <math.h>
 #include <font_awesome.h>
 
 #include "lvgl_display.h"
@@ -259,6 +260,36 @@ void LvglDisplay::SetMpu6050Data(float pitch, float roll, float yaw) {
     } else {
         ESP_LOGW("LvglDisplay", "MPU6050 label is null");
     }
+    
+    // 根据MPU6050数据调整表情
+    const char* emotion = "neutral";
+    
+    // 倾斜阈值（度数），降低到10度使表情更容易触发
+    const float TILT_THRESHOLD = 10.0f;
+    
+    // 使用pitch和roll的绝对值来判断倾斜程度
+    float abs_pitch = fabsf(pitch);
+    float abs_roll = fabsf(roll);
+    
+    if (abs_roll > TILT_THRESHOLD) {
+        if (roll < 0) {
+            emotion = "confused";  // 向左倾斜
+        } else {
+            emotion = "cool";      // 向右倾斜
+        }
+    } else if (abs_pitch > TILT_THRESHOLD) {
+        if (pitch > 0) {
+            emotion = "thinking";  // 向前倾斜
+        } else {
+            emotion = "sleepy";    // 向后倾斜
+        }
+    } else {
+        emotion = "neutral";       // 正常状态
+    }
+    
+    // 更新表情
+    SetEmotion(emotion);
+    ESP_LOGI("LvglDisplay", "MPU6050 emotion updated: %s", emotion);
 }
 
 void LvglDisplay::SetPowerSaveMode(bool on) {

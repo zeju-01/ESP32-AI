@@ -221,8 +221,6 @@ void Mpu6050::ComputeAngles() {
     float gyro_y = gy / gyro_scale_;
     float gyro_z = gz / gyro_scale_;
 
-    static float last_pitch = 0;
-    static float last_roll = 0;
     static uint64_t last_time = 0;
 
     uint64_t current_time = esp_timer_get_time();
@@ -232,9 +230,25 @@ void Mpu6050::ComputeAngles() {
     }
     last_time = current_time;
 
-    pitch_ = complementaryFilter(pitch_ + gyro_x * dt, accel_angle_pitch, 0.98f);
-    roll_ = complementaryFilter(roll_ + gyro_y * dt, accel_angle_roll, 0.98f);
+    // 计算基于陀螺仪的角度
+    float gyro_pitch = pitch_ + gyro_x * dt;
+    float gyro_roll = roll_ + gyro_y * dt;
+    
+    // 应用互补滤波器
+    pitch_ = complementaryFilter(gyro_pitch, accel_angle_pitch, 0.98f);
+    roll_ = complementaryFilter(gyro_roll, accel_angle_roll, 0.98f);
     yaw_ += gyro_z * dt;
+
+    // 角度归一化：确保 pitch 和 roll 保持在 -90° 到 +90° 范围内
+    // 因为加速度计只能测量这个范围内的角度
+    if (pitch_ > 90.0f) pitch_ = 90.0f;
+    if (pitch_ < -90.0f) pitch_ = -90.0f;
+    if (roll_ > 90.0f) roll_ = 90.0f;
+    if (roll_ < -90.0f) roll_ = -90.0f;
+
+    // 归一化 yaw 到 0-360° 范围
+    yaw_ = fmodf(yaw_, 360.0f);
+    if (yaw_ < 0) yaw_ += 360.0f;
 
     accel_x_ = (float)ax / accel_scale_;
     accel_y_ = (float)ay / accel_scale_;

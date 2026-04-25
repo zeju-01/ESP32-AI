@@ -128,3 +128,23 @@ void Mpu6050App::ResetAngles() {
     last_accel_z_ = 0;
     shake_count_ = 0;
 }
+
+const char* Mpu6050App::GetEmotion() {
+    if (!mpu6050_) {
+        return "neutral";
+    }
+    
+    if (IsShaken()) {
+        return "surprised";
+    } else if (IsTiltedLeft()) {
+        return "confused";
+    } else if (IsTiltedRight()) {
+        return "cool";
+    } else if (IsTiltedForward()) {
+        return "thinking";
+    } else if (IsTiltedBackward()) {
+        return "sleepy";
+    } else {
+        return "neutral";
+    }
+}
