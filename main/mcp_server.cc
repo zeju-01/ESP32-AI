@@ -30,6 +30,8 @@ McpServer::~McpServer() {
     tools_.clear();
 }
 
+void RegisterReminderTools();
+
 void McpServer::AddCommonTools() {
     // *Important* To speed up the response time, we add the common tools to the beginning of
     // the tools list to utilize the prompt cache.
@@ -123,6 +125,10 @@ void McpServer::AddCommonTools() {
 
     // Restore the original tools list to the end of the tools list
     tools_.insert(tools_.end(), original_tools.begin(), original_tools.end());
+
+    ESP_LOGI(TAG, "=== Calling RegisterReminderTools ===");
+    // Register reminder tools
+    RegisterReminderTools();
 }
 
 void McpServer::AddUserOnlyTools() {

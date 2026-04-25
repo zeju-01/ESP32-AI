@@ -9,6 +9,7 @@
 #include "mcp_server.h"
 #include "assets.h"
 #include "settings.h"
+#include "time_parser.h"
 
 #include <cstring>
 #include <esp_log.h>
@@ -160,6 +161,16 @@ void Application::Initialize() {
 
     // Update the status bar immediately to show the network state
     display->UpdateStatusBar(true);
+
+    // Initialize reminder manager
+    ReminderManager::GetInstance().Initialize();
+    ReminderManager::GetInstance().SetTriggerCallback([this](const ReminderTask& task) {
+        Schedule([this, task]() {
+            auto display = Board::GetInstance().GetDisplay();
+            display->ShowNotification(task.content.c_str(), 30000);
+            Alert("提醒", task.content.c_str(), "clock", "");
+        });
+    });
 }
 
 void Application::Run() {
@@ -251,6 +262,9 @@ void Application::Run() {
             display->UpdateStatusBar();
             
             Board::GetInstance().UpdateSensors();
+
+            // Check reminders every clock tick
+            ReminderManager::GetInstance().CheckReminders();
         
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
