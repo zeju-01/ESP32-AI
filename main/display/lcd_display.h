@@ -21,8 +21,6 @@ protected:
     esp_lcd_panel_handle_t panel_ = nullptr;
     
     lv_draw_buf_t draw_buf_;
-    lv_obj_t* top_bar_ = nullptr;
-    lv_obj_t* status_bar_ = nullptr;
     lv_obj_t* temp_humidity_bar_ = nullptr;
     lv_obj_t* mpu6050_bar_ = nullptr;
     lv_obj_t* content_ = nullptr;

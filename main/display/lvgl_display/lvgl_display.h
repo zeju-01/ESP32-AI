@@ -27,11 +27,18 @@ public:
 
     void SetTemperatureHumidity(float temperature, float humidity);
     void SetMpu6050Data(float pitch, float roll, float yaw);
+    void ShowSensorLabels(bool show);
+    void ShowEmotion(bool show);
+    void SetEmotionAutoUpdate(bool enable);
+    void UpdateSensorDisplay(float temperature, float humidity, float pitch, float roll, float yaw);
+    void ShowStatusBar(bool show);
 
 protected:
     esp_pm_lock_handle_t pm_lock_ = nullptr;
     lv_display_t *display_ = nullptr;
 
+    lv_obj_t *top_bar_ = nullptr;
+    lv_obj_t *status_bar_ = nullptr;
     lv_obj_t *network_label_ = nullptr;
     lv_obj_t *status_label_ = nullptr;
     lv_obj_t *notification_label_ = nullptr;
@@ -46,6 +53,7 @@ protected:
     const char* battery_icon_ = nullptr;
     const char* network_icon_ = nullptr;
     bool muted_ = false;
+    bool emotion_auto_update_ = true;
 
     std::chrono::system_clock::time_point last_status_update_time_;
     esp_timer_handle_t notification_timer_ = nullptr;

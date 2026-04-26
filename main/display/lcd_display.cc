@@ -489,7 +489,9 @@ void LcdDisplay::SetupUI() {
     
     // MPU6050标签 - 使用文本字体
     mpu6050_label_ = lv_label_create(mpu6050_bar_);
-    lv_label_set_text(mpu6050_label_, "Pitch:-- Roll:-- Yaw:--");
+    lv_label_set_text(mpu6050_label_, "P:-- R:-- Y:--");
+    lv_obj_set_width(mpu6050_label_, LV_HOR_RES);
+    lv_obj_set_style_text_align(mpu6050_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(mpu6050_label_, text_font, 0);
     lv_obj_set_style_text_color(mpu6050_label_, lvgl_theme->text_color(), 0);
 
@@ -1022,7 +1024,9 @@ void LcdDisplay::SetupUI() {
     
     // MPU6050标签 - 使用文本字体
     mpu6050_label_ = lv_label_create(mpu6050_bar_);
-    lv_label_set_text(mpu6050_label_, "Pitch:-- Roll:-- Yaw:--");
+    lv_label_set_text(mpu6050_label_, "P:-- R:-- Y:--");
+    lv_obj_set_width(mpu6050_label_, LV_HOR_RES);
+    lv_obj_set_style_text_align(mpu6050_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(mpu6050_label_, text_font, 0);
     lv_obj_set_style_text_color(mpu6050_label_, lvgl_theme->text_color(), 0);
 
@@ -1199,8 +1203,32 @@ void LcdDisplay::SetEmotion(const char* emotion) {
         gif_controller_.reset();
     }
     
+    // 处理空字符串情况，隐藏表情
+    if (emotion == nullptr || *emotion == '\0') {
+        DisplayLockGuard lock(this);
+        if (use_robot_face_ && robot_face_) {
+            lv_obj_add_flag(robot_face_->GetCanvas(), LV_OBJ_FLAG_HIDDEN);
+        }
+        if (emoji_image_) {
+            lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (emoji_label_) {
+            lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+        // 隐藏整个emoji_box_容器
+        if (emoji_box_) {
+            lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        }
+        ESP_LOGD(TAG, "Hiding emotion");
+        return;
+    }
+    
     if (use_robot_face_ && robot_face_) {
         DisplayLockGuard lock(this);
+        // 显示emoji_box_容器
+        if (emoji_box_) {
+            lv_obj_remove_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
+        }
         robot_face_->SetEmotion(emotion);
         lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);

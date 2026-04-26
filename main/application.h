@@ -41,6 +41,12 @@ enum AecMode {
     kAecOnServerSide,
 };
 
+enum PageState {
+    kPageEmotion,
+    kPageSensors,
+    kPageCount
+};
+
 class Application {
 public:
     static Application& GetInstance() {
@@ -121,6 +127,17 @@ public:
      * This includes closing audio channel, resetting protocol and ota objects
      */
     void ResetProtocol();
+    
+    /**
+     * Page management
+     */
+    void NextPage();
+    void ShowPage(PageState page);
+    
+    /**
+     * Event management
+     */
+    void SetEventBit(EventBits_t bit);
 
 private:
     Application();
@@ -144,6 +161,9 @@ private:
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
+    
+    // Page management
+    PageState current_page_ = kPageEmotion;
 
 
     // Event handlers

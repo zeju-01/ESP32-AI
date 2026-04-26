@@ -17,6 +17,7 @@
 #define TAG "Display"
 
 LvglDisplay::LvglDisplay() {
+    emotion_auto_update_ = true;
     // Notification timer
     esp_timer_create_args_t notification_timer_args = {
         .callback = [](void *arg) {
@@ -262,6 +263,11 @@ void LvglDisplay::SetMpu6050Data(float pitch, float roll, float yaw) {
     }
     
     // 根据MPU6050数据调整表情
+    if (!emotion_auto_update_) {
+        ESP_LOGD("LvglDisplay", "Emotion auto-update is disabled, skipping");
+        return;
+    }
+    
     const char* emotion = "neutral";
     
     // 倾斜阈值（度数），降低到10度使表情更容易触发
@@ -342,4 +348,78 @@ bool LvglDisplay::SnapshotToJpeg(std::string& jpeg_data, int quality) {
     ESP_LOGE(TAG, "LV_USE_SNAPSHOT is not enabled");
     return false;
 #endif
+}
+
+void LvglDisplay::ShowSensorLabels(bool show) {
+    DisplayLockGuard lock(this);
+    if (temperature_label_) {
+        if (show) {
+            lv_obj_remove_flag(temperature_label_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(temperature_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (humidity_label_) {
+        if (show) {
+            lv_obj_remove_flag(humidity_label_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(humidity_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (mpu6050_label_) {
+        if (show) {
+            lv_obj_remove_flag(mpu6050_label_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(mpu6050_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+void LvglDisplay::ShowEmotion(bool show) {
+    // 这个方法需要在具体的子类中实现，因为表情显示的方式不同
+    // 这里只是一个基类的空实现
+}
+
+void LvglDisplay::SetEmotionAutoUpdate(bool enable) {
+    emotion_auto_update_ = enable;
+    ESP_LOGI(TAG, "Emotion auto-update set to: %s", enable ? "enabled" : "disabled");
+}
+
+void LvglDisplay::UpdateSensorDisplay(float temperature, float humidity, float pitch, float roll, float yaw) {
+    DisplayLockGuard lock(this);
+    if (temperature_label_) {
+        char temp_str[32];
+        snprintf(temp_str, sizeof(temp_str), "%.1fC", temperature);
+        lv_label_set_text(temperature_label_, temp_str);
+    }
+    if (humidity_label_) {
+        char hum_str[32];
+        snprintf(hum_str, sizeof(hum_str), "%.1f%%", humidity);
+        lv_label_set_text(humidity_label_, hum_str);
+    }
+    if (mpu6050_label_) {
+        char mpu_str[64];
+        snprintf(mpu_str, sizeof(mpu_str), "P:%.1f R:%.1f Y:%.1f", pitch, roll, yaw);
+        lv_label_set_text(mpu6050_label_, mpu_str);
+    }
+}
+
+void LvglDisplay::ShowStatusBar(bool show) {
+    DisplayLockGuard lock(this);
+    // 控制top_bar_的显示/隐藏
+    if (top_bar_) {
+        if (show) {
+            lv_obj_remove_flag(top_bar_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(top_bar_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    // 控制status_bar_的显示/隐藏
+    if (status_bar_) {
+        if (show) {
+            lv_obj_remove_flag(status_bar_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(status_bar_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
 }

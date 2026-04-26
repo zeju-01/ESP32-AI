@@ -1,6 +1,7 @@
 #include "application.h"
 #include "board.h"
 #include "display.h"
+#include "display/lvgl_display/lvgl_display.h"
 #include "system_info.h"
 #include "audio_codec.h"
 #include "mqtt_protocol.h"
@@ -18,8 +19,16 @@
 #include <arpa/inet.h>
 #include <font_awesome.h>
 
+#define GPIO_BUTTON GPIO_NUM_14
+#define BUTTON_PIN_SEL (1ULL << GPIO_NUM_14)
+
 #define TAG "Application"
 
+
+static void IRAM_ATTR gpio_isr_handler(void* arg) {
+    Application* app = (Application*)arg;
+    app->SetEventBit(MAIN_EVENT_TOGGLE_CHAT);
+}
 
 Application::Application() {
     event_group_ = xEventGroupCreate();
@@ -33,6 +42,19 @@ Application::Application() {
 #else
     aec_mode_ = kAecOff;
 #endif
+
+    // Initialize GPIO14 for button
+    gpio_config_t io_conf;
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf.pin_bit_mask = BUTTON_PIN_SEL;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    gpio_config(&io_conf);
+
+    // Install GPIO ISR service
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(GPIO_BUTTON, gpio_isr_handler, this);
 
     esp_timer_create_args_t clock_timer_args = {
         .callback = [](void* arg) {
@@ -66,6 +88,8 @@ void Application::Initialize() {
     // Setup the display
     auto display = board.GetDisplay();
     display->SetupUI();
+    // 显示默认的表情页面
+    ShowPage(current_page_);
     // Print board name/version info
     display->SetChatMessage("system", SystemInfo::GetUserAgent().c_str());
 
@@ -703,23 +727,18 @@ void Application::HandleToggleChatEvent() {
         return;
     }
 
+    if (state == kDeviceStateIdle) {
+        // In idle state, toggle between pages
+        NextPage();
+        return;
+    }
+
     if (!protocol_) {
         ESP_LOGE(TAG, "Protocol not initialized");
         return;
     }
 
-    if (state == kDeviceStateIdle) {
-        ListeningMode mode = GetDefaultListeningMode();
-        if (!protocol_->IsAudioChannelOpened()) {
-            SetDeviceState(kDeviceStateConnecting);
-            // Schedule to let the state change be processed first (UI update)
-            Schedule([this, mode]() {
-                ContinueOpenAudioChannel(mode);
-            });
-            return;
-        }
-        SetListeningMode(mode);
-    } else if (state == kDeviceStateSpeaking) {
+    if (state == kDeviceStateSpeaking) {
         AbortSpeaking(kAbortReasonNone);
     } else if (state == kDeviceStateListening) {
         protocol_->CloseAudioChannel();
@@ -798,7 +817,9 @@ void Application::HandleWakeWordDetectedEvent() {
     auto wake_word = audio_service_.GetLastWakeWord();
     ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
 
+    // 语音唤醒后切换到表情页面
     if (state == kDeviceStateIdle) {
+        ShowPage(kPageEmotion);
         audio_service_.EncodeWakeWord();
         auto wake_word = audio_service_.GetLastWakeWord();
 
@@ -882,18 +903,25 @@ void Application::HandleStateChangedEvent() {
         case kDeviceStateIdle:
             display->SetStatus(Lang::Strings::STANDBY);
             display->ClearChatMessages();  // Clear messages first
-            display->SetEmotion("neutral"); // Then set emotion (wechat mode checks child count)
+            // 检查当前页面，如果是表情页面才设置表情
+            if (current_page_ == kPageEmotion) {
+                display->SetEmotion("neutral"); // Then set emotion (wechat mode checks child count)
+            }
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);
-            display->SetEmotion("neutral");
+            if (current_page_ == kPageEmotion) {
+                display->SetEmotion("neutral");
+            }
             display->SetChatMessage("system", "");
             break;
         case kDeviceStateListening:
             display->SetStatus(Lang::Strings::LISTENING);
-            display->SetEmotion("neutral");
+            if (current_page_ == kPageEmotion) {
+                display->SetEmotion("neutral");
+            }
 
             // Make sure the audio processor is running
             if (play_popup_on_listening_ || !audio_service_.IsAudioProcessorRunning()) {
@@ -1131,5 +1159,55 @@ void Application::ResetProtocol() {
         // Reset protocol
         protocol_.reset();
     });
+}
+
+void Application::NextPage() {
+    current_page_ = static_cast<PageState>((current_page_ + 1) % kPageCount);
+    ShowPage(current_page_);
+}
+
+void Application::ShowPage(PageState page) {
+    auto display = Board::GetInstance().GetDisplay();
+    auto& board = Board::GetInstance();
+    
+    // 尝试动态转换为LvglDisplay，以访问传感器标签控制方法
+    LvglDisplay* lvgl_display = dynamic_cast<LvglDisplay*>(display);
+    
+    if (page == kPageEmotion) {
+        display->ClearChatMessages();
+        display->SetEmotion("neutral");
+        display->SetStatus("表情页面");
+        // 表情页面：隐藏传感器标签，只显示表情，隐藏状态栏
+        if (lvgl_display) {
+            lvgl_display->ShowSensorLabels(false);
+            lvgl_display->SetEmotionAutoUpdate(true);
+            lvgl_display->ShowStatusBar(false);
+        }
+    } else if (page == kPageSensors) {
+        display->ClearChatMessages();
+        display->SetStatus("传感器页面");
+        // 传感器页面：显示传感器标签，不显示表情，显示状态栏
+        if (lvgl_display) {
+            lvgl_display->ShowSensorLabels(true);
+            lvgl_display->SetEmotionAutoUpdate(false);
+            lvgl_display->ShowStatusBar(true);
+        }
+        // 隐藏表情
+        display->SetEmotion("");
+        float temperature = 0.0f;
+        float humidity = 0.0f;
+        float pitch = 0.0f, roll = 0.0f, yaw = 0.0f;
+
+        board.GetTemperature(temperature);
+
+        // 直接更新传感器标签显示
+        if (lvgl_display) {
+            lvgl_display->UpdateSensorDisplay(temperature, humidity, pitch, roll, yaw);
+        }
+    }
+}
+
+void Application::SetEventBit(EventBits_t bit) {
+    xEventGroupSetBits(event_group_, bit);
 }
 

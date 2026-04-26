@@ -212,14 +212,19 @@ void RobotFace::CreateBlush() {
 }
 
 void RobotFace::SetEmotion(const char* emotion) {
-    if (emotion == nullptr) {
-        if (mode_ == Mode::DRAW) {
-            DrawNeutral();
+    if (emotion == nullptr || *emotion == '\0') {
+        // 隐藏表情
+        if (container_) {
+            lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
         }
         return;
     }
 
     current_emotion_ = emotion;
+    // 确保表情显示
+    if (container_) {
+        lv_obj_remove_flag(container_, LV_OBJ_FLAG_HIDDEN);
+    }
 
     if (mode_ == Mode::IMAGE) {
         SetImageEmotion(emotion);
