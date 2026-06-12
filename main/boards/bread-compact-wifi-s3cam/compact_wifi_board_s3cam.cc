@@ -142,13 +142,13 @@ private:
         ret = esp_io_expander_set_dir(pca9555_expander_, 15, IO_EXPANDER_INPUT);  // P17 - 按键2
         ESP_LOGI(TAG, "PCA9555 IO directions configured");
 
-        // 设置初始电平
-        esp_io_expander_set_level(pca9555_expander_, 5, 1);  // 显示屏CS高电平(未选中)
-        esp_io_expander_set_level(pca9555_expander_, 6, 1);  // 显示屏RST高电平(正常)
-        esp_io_expander_set_level(pca9555_expander_, 7, 1);  // 背光开启
-        esp_io_expander_set_level(pca9555_expander_, 1, 0);  // 马达关闭
-        esp_io_expander_set_level(pca9555_expander_, 8, 0);  // 红外发射关闭
-        ESP_LOGI(TAG, "PCA9555 initial levels set");
+        // 设置初始电平（使用直接操作函数，避免esp_io_expander_set_level的内部映射错误）
+        pca9555_set_pin_level_direct(pca9555_expander_, 5, 1);  // 显示屏CS高电平(未选中)
+        pca9555_set_pin_level_direct(pca9555_expander_, 6, 1);  // 显示屏RST高电平(正常)
+        pca9555_set_pin_level_direct(pca9555_expander_, 7, 1);  // 背光开启
+        pca9555_set_pin_level_direct(pca9555_expander_, 1, 0);  // 马达关闭
+        pca9555_set_pin_level_direct(pca9555_expander_, 8, 0);  // 红外发射关闭
+        ESP_LOGI(TAG, "PCA9555 initial levels set via direct I2C operations");
 
         xTaskCreatePinnedToCore(TestPca9555P13, "PCA9555_Test", 2048, this, 5, NULL, 0);
         ESP_LOGI(TAG, "PCA9555 test task created");
@@ -383,10 +383,10 @@ public:
     }
 
     virtual Backlight* GetBacklight() override {
-        // 背光由PCA9555的P07控制，在Initialize()中已设置为输出
-        // 这里直接通过PCA9555控制背光，不使用PwmBacklight
+        // 背光由PCA9555的P07控制，使用直接I2C操作避免esp_io_expander_set_level的内部映射错误
         if (pca9555_expander_) {
-            esp_io_expander_set_level(pca9555_expander_, 7, 1); // 开启背光 (P07=7)
+            pca9555_set_pin_level_direct(pca9555_expander_, 7, 1); // 开启背光 (P07=7)
+            ESP_LOGI(TAG, "Backlight P07 set to level 1 via direct I2C");
         }
         return nullptr;  // 背光由PCA9555直接控制，不使用PwmBacklight
     }
