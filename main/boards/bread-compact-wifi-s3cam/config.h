@@ -4,7 +4,7 @@
 #include <driver/gpio.h>
 
 #define AUDIO_INPUT_SAMPLE_RATE  16000
-#define AUDIO_OUTPUT_SAMPLE_RATE 24000
+#define AUDIO_OUTPUT_SAMPLE_RATE 16000  // ES8374要求输入输出采样率相同
 
 // ES8374音频编解码器配置
 #define AUDIO_I2S_GPIO_MCLK     GPIO_NUM_16   // MCLK时钟输出到ES8374
