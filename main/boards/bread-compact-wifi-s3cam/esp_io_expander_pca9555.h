@@ -27,6 +27,30 @@ extern "C" {
 esp_err_t esp_io_expander_new_i2c_pca9555(i2c_master_bus_handle_t i2c_bus, uint32_t dev_addr, esp_io_expander_handle_t *handle_ret);
 
 /**
+ * @brief Directly set level of a PCA9555 pin using existing expander handle (recommended)
+ *
+ * @param[in] handle     PCA9555 expander handle
+ * @param[in] pin_num    Pin number (0-15, P00-P17)
+ * @param[in] level      Level to set (0 or 1)
+ *
+ * @return
+ *      - ESP_OK: Success, otherwise returns ESP_ERR_xxx
+ */
+esp_err_t pca9555_set_pin_level_direct(esp_io_expander_handle_t handle, uint8_t pin_num, uint8_t level);
+
+/**
+ * @brief Directly set direction of a PCA9555 pin using existing expander handle (recommended)
+ *
+ * @param[in] handle     PCA9555 expander handle
+ * @param[in] pin_num    Pin number (0-15, P00-P17)
+ * @param[in] is_output  1=output, 0=input
+ *
+ * @return
+ *      - ESP_OK: Success, otherwise returns ESP_ERR_xxx
+ */
+esp_err_t pca9555_set_pin_direction_direct(esp_io_expander_handle_t handle, uint8_t pin_num, uint8_t is_output);
+
+/**
  * @brief Directly set level of a PCA9555 pin (bypasses esp_io_expander framework)
  *
  * @param[in] i2c_bus    I2C bus handle

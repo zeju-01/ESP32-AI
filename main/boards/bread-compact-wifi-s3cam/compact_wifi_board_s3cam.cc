@@ -161,18 +161,17 @@ private:
         ESP_LOGI(TAG, "PCA9555 P13 test task started - toggling every 1 second");
         ESP_LOGI(TAG, "PCA9555 expander handle: %p", board->pca9555_expander_);
 
-        if (board->i2c_bus_ == NULL) {
-            ESP_LOGE(TAG, "I2C bus handle is NULL! Test task exiting.");
+        if (board->pca9555_expander_ == NULL) {
+            ESP_LOGE(TAG, "PCA9555 expander handle is NULL! Test task exiting.");
             vTaskDelete(NULL);
             return;
         }
 
         // P13 = 引脚编号11（P00-P07=0-7, P10-P17=8-15）
         const uint8_t p13_pin = 11;
-        const uint32_t pca9555_addr = PCA9555_I2C_ADDRESS;
 
-        // 先配置P13为输出
-        esp_err_t ret = pca9555_set_pin_direction(board->i2c_bus_, pca9555_addr, p13_pin, 1);
+        // 先配置P13为输出（使用直接操作函数，复用已存在的设备句柄）
+        esp_err_t ret = pca9555_set_pin_direction_direct(board->pca9555_expander_, p13_pin, 1);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to configure P13 as output: %s", esp_err_to_name(ret));
         } else {
@@ -183,8 +182,8 @@ private:
             level = !level;
             ESP_LOGI(TAG, "Setting PCA9555 P13 (pin %d) to level: %d", p13_pin, level);
             
-            // 使用直接I2C操作设置P13电平
-            ret = pca9555_set_pin_level(board->i2c_bus_, pca9555_addr, p13_pin, level ? 1 : 0);
+            // 使用直接操作函数设置P13电平（复用已存在的设备句柄）
+            ret = pca9555_set_pin_level_direct(board->pca9555_expander_, p13_pin, level ? 1 : 0);
             if (ret != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to set P13 level: %s", esp_err_to_name(ret));
             } else {

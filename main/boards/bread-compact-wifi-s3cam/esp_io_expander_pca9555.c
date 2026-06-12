@@ -172,6 +172,130 @@ static esp_err_t del(esp_io_expander_t *handle)
     return ESP_OK;
 }
 
+/**
+ * @brief Directly set level of a PCA9555 pin using existing expander handle
+ *
+ * @param[in] handle     PCA9555 expander handle
+ * @param[in] pin_num    Pin number (0-15, P00-P17)
+ * @param[in] level      Level to set (0 or 1)
+ *
+ * @return
+ *      - ESP_OK: Success, otherwise returns ESP_ERR_xxx
+ */
+esp_err_t pca9555_set_pin_level_direct(esp_io_expander_handle_t handle, uint8_t pin_num, uint8_t level)
+{
+    ESP_RETURN_ON_FALSE(pin_num < 16, ESP_ERR_INVALID_ARG, TAG, "Pin number must be 0-15");
+    
+    esp_io_expander_pca9555_t *pca9555 = (esp_io_expander_pca9555_t *)__containerof(handle, esp_io_expander_pca9555_t, base);
+    
+    // Determine which register to write
+    uint8_t reg_addr;
+    uint8_t bit_mask;
+    
+    if (pin_num < 8) {
+        reg_addr = OUTPUT_REG_ADDR0;
+        bit_mask = (1 << pin_num);
+    } else {
+        reg_addr = OUTPUT_REG_ADDR1;
+        bit_mask = (1 << (pin_num - 8));
+    }
+    
+    // Read current output register value
+    uint8_t current_value = 0;
+    esp_err_t ret = i2c_master_transmit_receive(pca9555->i2c_handle, &reg_addr, 1, &current_value, 1, I2C_TIMEOUT_MS);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read output register");
+        return ret;
+    }
+    
+    // Modify the bit
+    if (level) {
+        current_value |= bit_mask;
+    } else {
+        current_value &= ~bit_mask;
+    }
+    
+    // Write back
+    uint8_t data[2] = {reg_addr, current_value};
+    ret = i2c_master_transmit(pca9555->i2c_handle, data, sizeof(data), I2C_TIMEOUT_MS);
+    
+    if (ret == ESP_OK) {
+        // Update cache
+        if (pin_num < 8) {
+            pca9555->regs.output = (pca9555->regs.output & 0xFF00) | current_value;
+        } else {
+            pca9555->regs.output = (pca9555->regs.output & 0x00FF) | ((uint16_t)current_value << 8);
+        }
+        ESP_LOGD(TAG, "Set pin %d level to %d", pin_num, level);
+    } else {
+        ESP_LOGE(TAG, "Failed to set pin %d level", pin_num);
+    }
+    
+    return ret;
+}
+
+/**
+ * @brief Directly set direction of a PCA9555 pin using existing expander handle
+ *
+ * @param[in] handle     PCA9555 expander handle
+ * @param[in] pin_num    Pin number (0-15, P00-P17)
+ * @param[in] is_output  1=output, 0=input
+ *
+ * @return
+ *      - ESP_OK: Success, otherwise returns ESP_ERR_xxx
+ */
+esp_err_t pca9555_set_pin_direction_direct(esp_io_expander_handle_t handle, uint8_t pin_num, uint8_t is_output)
+{
+    ESP_RETURN_ON_FALSE(pin_num < 16, ESP_ERR_INVALID_ARG, TAG, "Pin number must be 0-15");
+    
+    esp_io_expander_pca9555_t *pca9555 = (esp_io_expander_pca9555_t *)__containerof(handle, esp_io_expander_pca9555_t, base);
+    
+    // Determine which register to write
+    uint8_t reg_addr;
+    uint8_t bit_mask;
+    
+    if (pin_num < 8) {
+        reg_addr = CONFIG_REG_ADDR0;
+        bit_mask = (1 << pin_num);
+    } else {
+        reg_addr = CONFIG_REG_ADDR1;
+        bit_mask = (1 << (pin_num - 8));
+    }
+    
+    // Read current config register value
+    uint8_t current_value = 0;
+    esp_err_t ret = i2c_master_transmit_receive(pca9555->i2c_handle, &reg_addr, 1, &current_value, 1, I2C_TIMEOUT_MS);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read config register");
+        return ret;
+    }
+    
+    // Modify the bit (0=output, 1=input)
+    if (is_output) {
+        current_value &= ~bit_mask;  // Clear bit for output
+    } else {
+        current_value |= bit_mask;   // Set bit for input
+    }
+    
+    // Write back
+    uint8_t data[2] = {reg_addr, current_value};
+    ret = i2c_master_transmit(pca9555->i2c_handle, data, sizeof(data), I2C_TIMEOUT_MS);
+    
+    if (ret == ESP_OK) {
+        // Update cache
+        if (pin_num < 8) {
+            pca9555->regs.direction = (pca9555->regs.direction & 0xFF00) | current_value;
+        } else {
+            pca9555->regs.direction = (pca9555->regs.direction & 0x00FF) | ((uint16_t)current_value << 8);
+        }
+        ESP_LOGD(TAG, "Set pin %d direction to %s", pin_num, is_output ? "output" : "input");
+    } else {
+        ESP_LOGE(TAG, "Failed to set pin %d direction", pin_num);
+    }
+    
+    return ret;
+}
+
 esp_err_t pca9555_set_pin_level(i2c_master_bus_handle_t i2c_bus, uint32_t dev_addr, uint8_t pin_num, uint8_t level)
 {
     ESP_RETURN_ON_FALSE(pin_num < 16, ESP_ERR_INVALID_ARG, TAG, "Pin number must be 0-15");
