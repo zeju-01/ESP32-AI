@@ -97,55 +97,46 @@ private:
         }
         ESP_LOGI(TAG, "PCA9555 driver created successfully");
 
-        // 配置PCA9555扩展IO方向
+        // 配置PCA9555扩展IO方向（使用直接操作函数）
         // PCA9555: 0=输出, 1=输入
-        // P00=0(输入), P01=1(输出), P05=5(输出), P06=6(输出), P07=7(输出)
-        // P10=8(输出), P11=9(输入), P13=11(输出), P15=13(输入), P16=14(输入), P17=15(输入)
-        ESP_LOGI(TAG, "Setting PCA9555 direction registers...");
+        ESP_LOGI(TAG, "Setting PCA9555 direction registers via direct I2C...");
         
-        ret = esp_io_expander_set_dir(pca9555_expander_, 0, IO_EXPANDER_INPUT);   // P00 - 按键1 (输入)
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "set_dir for P00 returned %s", esp_err_to_name(ret));
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 1, IO_EXPANDER_OUTPUT); // P01 - 马达
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "set_dir for P01 failed: %s", esp_err_to_name(ret));
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 5, IO_EXPANDER_OUTPUT); // P05 - 显示屏CS
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "set_dir for P05 failed: %s", esp_err_to_name(ret));
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 6, IO_EXPANDER_OUTPUT); // P06 - 显示屏RST
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "set_dir for P06 failed: %s", esp_err_to_name(ret));
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 7, IO_EXPANDER_OUTPUT); // P07 - 背光控制
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "set_dir for P07 failed: %s", esp_err_to_name(ret));
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 8, IO_EXPANDER_OUTPUT); // P10 - 红外发射
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "set_dir for P10 failed: %s", esp_err_to_name(ret));
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 9, IO_EXPANDER_INPUT);  // P11 - 红外接收
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "set_dir for P11 returned %s", esp_err_to_name(ret));
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 11, IO_EXPANDER_OUTPUT); // P13 - LED
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "set_dir for P13 failed: %s", esp_err_to_name(ret));
-        } else {
-            ESP_LOGI(TAG, "P13 direction set to OUTPUT successfully");
-        }
-        ret = esp_io_expander_set_dir(pca9555_expander_, 13, IO_EXPANDER_INPUT);  // P15 - 编码开关左
-        ret = esp_io_expander_set_dir(pca9555_expander_, 14, IO_EXPANDER_INPUT);  // P16 - 编码开关右
-        ret = esp_io_expander_set_dir(pca9555_expander_, 15, IO_EXPANDER_INPUT);  // P17 - 按键2
-        ESP_LOGI(TAG, "PCA9555 IO directions configured");
+        // P00 - 按键1 (输入)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 0, 0);
+        // P01 - 马达 (输出)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 1, 1);
+        // P05 - 显示屏CS (输出)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 5, 1);
+        // P06 - 显示屏RST (输出)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 6, 1);
+        // P07 - 背光控制 (输出)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 7, 1);
+        ESP_LOGI(TAG, "P07 direction set to OUTPUT");
+        // P10 - 红外发射 (输出)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 8, 1);
+        // P11 - 红外接收 (输入)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 9, 0);
+        // P13 - LED (输出)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 11, 1);
+        ESP_LOGI(TAG, "P13 direction set to OUTPUT");
+        // P15 - 编码开关左 (输入)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 13, 0);
+        // P16 - 编码开关右 (输入)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 14, 0);
+        // P17 - 按键2 (输入)
+        pca9555_set_pin_direction_direct(pca9555_expander_, 15, 0);
+        ESP_LOGI(TAG, "PCA9555 IO directions configured via direct I2C");
 
         // 设置初始电平（使用直接操作函数，避免esp_io_expander_set_level的内部映射错误）
         pca9555_set_pin_level_direct(pca9555_expander_, 5, 1);  // 显示屏CS高电平(未选中)
         pca9555_set_pin_level_direct(pca9555_expander_, 6, 1);  // 显示屏RST高电平(正常)
-        pca9555_set_pin_level_direct(pca9555_expander_, 7, 0);  // 背光开启(低电平有效)
+        ESP_LOGI(TAG, "Setting P07 (backlight) to level 0 (active low)...");
+        esp_err_t ret = pca9555_set_pin_level_direct(pca9555_expander_, 7, 0);  // 背光开启(低电平有效)
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "SUCCESS: P07 set to level 0");
+        } else {
+            ESP_LOGE(TAG, "FAILED: P07 set to level 0 failed: %s", esp_err_to_name(ret));
+        }
         pca9555_set_pin_level_direct(pca9555_expander_, 1, 0);  // 马达关闭
         pca9555_set_pin_level_direct(pca9555_expander_, 8, 0);  // 红外发射关闭
         ESP_LOGI(TAG, "PCA9555 initial levels set via direct I2C operations");
