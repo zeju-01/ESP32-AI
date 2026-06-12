@@ -1,5 +1,5 @@
 #include "wifi_board.h"
-#include "codecs/no_audio_codec.h"
+#include "codecs/es8374_audio_codec.h"
 #include "display/lcd_display.h"
 #include "system_reset.h"
 #include "application.h"
@@ -12,6 +12,7 @@
 #include "mpu6050_app.h"
 #include "sht30_app.h"
 #include "i2c_scanner.h"
+#include "esp_io_expander_pca9555.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
@@ -19,6 +20,13 @@
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 #include <driver/spi_common.h>
+
+// PCA9555 test pin - P13 (Port 1, Pin 3)
+// PCA9555的8位写地址是0x40，转换为7位地址：0x40 >> 1 = 0x20
+// PCA9555有16个引脚，编号0-15，P00-P07对应0-7，P10-P17对应8-15
+// P13 = Port 1, Pin 3 = 引脚编号 11 (P10=8, P11=9, P12=10, P13=11)
+#define PCA9555_TEST_PIN 11  // P13对应的引脚编号是11
+#define PCA9555_I2C_ADDRESS (0x40 >> 1)  // 7位地址
 
 #if defined(LCD_TYPE_ILI9341_SERIAL)
 #include "esp_lcd_ili9341.h"
@@ -72,6 +80,79 @@ private:
     i2c_master_bus_handle_t i2c_bus_;
     Mpu6050App* mpu6050_app_;
     Sht30App* sht30_app_;
+    esp_io_expander_handle_t pca9555_expander_ = NULL;
+
+    void InitializePca9555() {
+        ESP_LOGI(TAG, "Initializing PCA9555 IO expander at address 0x%02X...", PCA9555_I2C_ADDRESS);
+        
+        esp_err_t ret = esp_io_expander_new_i2c_pca9555(i2c_bus_, PCA9555_I2C_ADDRESS, &pca9555_expander_);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "PCA9555 create returned error: %s", esp_err_to_name(ret));
+            ESP_LOGE(TAG, "Possible causes:");
+            ESP_LOGE(TAG, "1. I2C bus not initialized properly");
+            ESP_LOGE(TAG, "2. PCA9555 not connected or not powered");
+            ESP_LOGE(TAG, "3. Incorrect I2C address (check A0-A2 pins)");
+            ESP_LOGE(TAG, "4. SDA/SCL pins not connected correctly");
+            return;
+        }
+        ESP_LOGI(TAG, "PCA9555 driver created successfully");
+
+        // 配置PCA9555扩展IO方向
+        // 输出引脚
+        ret = esp_io_expander_set_dir(pca9555_expander_, 0, IO_EXPANDER_INPUT);   // P00 - 按键1 (输入)
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 1, IO_EXPANDER_OUTPUT); // P01 - 马达
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 5, IO_EXPANDER_OUTPUT); // P05 - 显示屏CS
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 6, IO_EXPANDER_OUTPUT); // P06 - 显示屏RST
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 7, IO_EXPANDER_OUTPUT); // P07 - 背光控制
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 8, IO_EXPANDER_OUTPUT); // P10 - 红外发射 (P10=8)
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 9, IO_EXPANDER_INPUT);  // P11 - 红外接收 (输入, P11=9)
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 11, IO_EXPANDER_OUTPUT); // P13 - LED (P13=11)
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 13, IO_EXPANDER_INPUT);  // P15 - 编码开关左 (输入, P15=13)
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 14, IO_EXPANDER_INPUT);  // P16 - 编码开关右 (输入, P16=14)
+        ret |= esp_io_expander_set_dir(pca9555_expander_, 15, IO_EXPANDER_INPUT);  // P17 - 按键2/编码按钮 (输入, P17=15)
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "PCA9555 set dir returned error: %s", esp_err_to_name(ret));
+            return;
+        }
+        ESP_LOGI(TAG, "PCA9555 IO directions configured");
+
+        // 设置初始电平
+        esp_io_expander_set_level(pca9555_expander_, 5, 1);  // 显示屏CS高电平(未选中)
+        esp_io_expander_set_level(pca9555_expander_, 6, 1);  // 显示屏RST高电平(正常)
+        esp_io_expander_set_level(pca9555_expander_, 7, 1);  // 背光开启
+        esp_io_expander_set_level(pca9555_expander_, 1, 0);  // 马达关闭
+        esp_io_expander_set_level(pca9555_expander_, 8, 0); // 红外发射关闭 (P10=8)
+        ESP_LOGI(TAG, "PCA9555 initial levels set");
+
+        xTaskCreatePinnedToCore(TestPca9555P13, "PCA9555_Test", 2048, this, 5, NULL, 0);
+        ESP_LOGI(TAG, "PCA9555 test task created");
+    }
+
+    static void TestPca9555P13(void* arg) {
+        CompactWifiBoardS3Cam* board = (CompactWifiBoardS3Cam*)arg;
+        bool level = false;
+
+        ESP_LOGI(TAG, "PCA9555 P13 test task started - toggling every 1 second");
+        ESP_LOGI(TAG, "PCA9555 expander handle: %p", board->pca9555_expander_);
+
+        if (board->pca9555_expander_ == NULL) {
+            ESP_LOGE(TAG, "PCA9555 expander handle is NULL! Test task exiting.");
+            vTaskDelete(NULL);
+            return;
+        }
+
+        while (true) {
+            level = !level;
+            ESP_LOGI(TAG, "Setting PCA9555 P13 (pin %d) to level: %d", PCA9555_TEST_PIN, level);
+            esp_err_t ret = esp_io_expander_set_level(board->pca9555_expander_, PCA9555_TEST_PIN, level ? 1 : 0);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to set PCA9555 P13 level: %s", esp_err_to_name(ret));
+            } else {
+                ESP_LOGI(TAG, "Successfully set PCA9555 P13 to: %d", level);
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
 
     void InitializeSpi() {
         spi_bus_config_t buscfg = {};
@@ -87,24 +168,26 @@ private:
     void InitializeLcdDisplay() {
         esp_lcd_panel_io_handle_t panel_io = nullptr;
         esp_lcd_panel_handle_t panel = nullptr;
-        // 液晶屏控制IO初始化
+        
         ESP_LOGD(TAG, "Install panel IO");
         esp_lcd_panel_io_spi_config_t io_config = {};
-        io_config.cs_gpio_num = DISPLAY_CS_PIN;
+        io_config.cs_gpio_num = GPIO_NUM_NC;  // CS由PCA9555控制
         io_config.dc_gpio_num = DISPLAY_DC_PIN;
         io_config.spi_mode = DISPLAY_SPI_MODE;
         io_config.pclk_hz = 40 * 1000 * 1000;
         io_config.trans_queue_depth = 10;
         io_config.lcd_cmd_bits = 8;
         io_config.lcd_param_bits = 8;
+        io_config.on_color_trans_done = nullptr;  // 不使用回调
+        
         ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI3_HOST, &io_config, &panel_io));
 
-        // 初始化液晶屏驱动芯片
         ESP_LOGD(TAG, "Install LCD driver");
         esp_lcd_panel_dev_config_t panel_config = {};
-        panel_config.reset_gpio_num = DISPLAY_RST_PIN;
+        panel_config.reset_gpio_num = GPIO_NUM_NC;  // RST由PCA9555控制
         panel_config.rgb_ele_order = DISPLAY_RGB_ORDER;
         panel_config.bits_per_pixel = 16;
+        
 #if defined(LCD_TYPE_ILI9341_SERIAL)
         ESP_ERROR_CHECK(esp_lcd_new_panel_ili9341(panel_io, &panel_config, &panel));
 #elif defined(LCD_TYPE_GC9A01_SERIAL)
@@ -117,17 +200,26 @@ private:
         ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(panel_io, &panel_config, &panel));
 #endif
         
-        esp_lcd_panel_reset(panel);
+        // 使用PCA9555进行显示屏复位
+        esp_io_expander_set_level(pca9555_expander_, 6, 0); // RST低电平 (P06=6)
+        vTaskDelay(pdMS_TO_TICKS(10));
+        esp_io_expander_set_level(pca9555_expander_, 6, 1); // RST高电平 (P06=6)
+        vTaskDelay(pdMS_TO_TICKS(10));
 
         esp_lcd_panel_init(panel);
         esp_lcd_panel_invert_color(panel, true);
         esp_lcd_panel_swap_xy(panel, true);
         esp_lcd_panel_mirror(panel, false, false);
-#ifdef  LCD_TYPE_GC9A01_SERIAL
+        
+#ifdef LCD_TYPE_GC9A01_SERIAL
         panel_config.vendor_config = &gc9107_vendor_config;
 #endif
+        
         display_ = new SpiLcdDisplay(panel_io, panel,
                                     320, 172, 0, 34, false, true, true);
+        
+        // 开启背光
+        esp_io_expander_set_level(pca9555_expander_, 7, 1); // P07=7
     }
 
     void InitializeCamera() {
@@ -172,11 +264,11 @@ private:
     }
 
     void InitializeI2c() {
-        // 使用与摄像头相同的I2C总线（GPIO 4和5）
+        // 使用自定义I2C总线（GPIO 17=SDA, GPIO 18=SCL）
         i2c_master_bus_config_t i2c_bus_cfg = {
             .i2c_port = I2C_NUM_0,
-            .sda_io_num = GPIO_NUM_4,
-            .scl_io_num = GPIO_NUM_5,
+            .sda_io_num = GPIO_NUM_17,
+            .scl_io_num = GPIO_NUM_18,
             .clk_source = I2C_CLK_SRC_DEFAULT,
             .glitch_ignore_cnt = 7,
             .intr_priority = 0,
@@ -213,6 +305,9 @@ private:
             delete sht30_app_;
             sht30_app_ = nullptr;
         }
+
+        // 初始化PCA9555 IO扩展芯片
+        InitializePca9555();
     }
 
 public:
@@ -222,14 +317,10 @@ public:
         mpu6050_app_(nullptr),
         sht30_app_(nullptr) {
         InitializeSpi();
-        InitializeLcdDisplay();
+        InitializeI2c();           // 先初始化I2C和PCA9555
+        InitializeLcdDisplay();    // 再初始化显示屏（需要PCA9555）
         InitializeButtons();
         InitializeCamera();
-        InitializeI2c();
-        if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
-            GetBacklight()->RestoreBrightness();
-        }
-        
     }
 
     virtual Led* GetLed() override {
@@ -238,13 +329,10 @@ public:
     }
 
     virtual AudioCodec* GetAudioCodec() override {
-#ifdef AUDIO_I2S_METHOD_SIMPLEX
-        static NoAudioCodecSimplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
-            AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT, AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
-#else
-        static NoAudioCodecDuplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
-            AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN);
-#endif
+        // PCA9555使用7位地址0x40，ES8374使用7位地址0x20，不会冲突
+        static Es8374AudioCodec audio_codec(i2c_bus_, I2C_NUM_0, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+            AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN,
+            AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8374_ADDR, true);
         return &audio_codec;
     }
 
@@ -253,8 +341,10 @@ public:
     }
 
     virtual Backlight* GetBacklight() override {
-        if (DISPLAY_BACKLIGHT_PIN != GPIO_NUM_NC) {
-            static PwmBacklight backlight(DISPLAY_BACKLIGHT_PIN, DISPLAY_BACKLIGHT_OUTPUT_INVERT);
+        // 背光由PCA9555的P07控制
+        if (pca9555_expander_) {
+            esp_io_expander_set_level(pca9555_expander_, 7, 1); // 开启背光 (P07=7)
+            static PwmBacklight backlight(GPIO_NUM_NC, false); // 使用虚拟引脚，实际由PCA9555控制
             return &backlight;
         }
         return nullptr;

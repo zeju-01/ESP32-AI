@@ -8,6 +8,7 @@
 #include "config.h"
 #include "power_save_timer.h"
 #include "i2c_device.h"
+#include "esp_io_expander_pca9555.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -22,6 +23,10 @@
 #include <esp_lcd_panel_rgb.h>
 
 #define TAG "WaveshareEsp32s3TouchLCD43c"
+
+// PCA9555 test pin - P13 (Port 1, Pin 3)
+#define PCA9555_TEST_PIN IO_EXPANDER_PIN_NUM_11
+#define PCA9555_I2C_ADDRESS ESP_IO_EXPANDER_I2C_PCA9555_ADDRESS_040
 
 class CustomBacklight : public Backlight {
 public:
@@ -45,6 +50,7 @@ private:
     i2c_master_bus_handle_t i2c_bus_;
     LcdDisplay* display_;
     esp_io_expander_handle_t io_expander = NULL;
+    esp_io_expander_handle_t pca9555_expander = NULL;
     PowerSaveTimer* power_save_timer_;
     CustomBacklight *backlight_;
 
@@ -96,6 +102,40 @@ private:
         vTaskDelay(pdMS_TO_TICKS(200));
         esp_io_expander_set_level(io_expander, BSP_LCD_TOUCH_RST, 1);
         vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    void InitializePca9555(void) {
+        // Initialize PCA9555 IO expander
+        esp_err_t ret = esp_io_expander_new_i2c_pca9555(i2c_bus_, PCA9555_I2C_ADDRESS, &pca9555_expander);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "PCA9555 create returned error: %s", esp_err_to_name(ret));
+            return;
+        }
+        ESP_LOGI(TAG, "PCA9555 initialized successfully");
+
+        // Set P13 (IO_EXPANDER_PIN_NUM_11) as output
+        ret = esp_io_expander_set_dir(pca9555_expander, PCA9555_TEST_PIN, IO_EXPANDER_OUTPUT);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "PCA9555 set dir returned error: %s", esp_err_to_name(ret));
+            return;
+        }
+
+        // Start test task only if initialization succeeded
+        xTaskCreatePinnedToCore(TestPca9555P13, "PCA9555_Test", 2048, this, 5, NULL, 0);
+    }
+
+    static void TestPca9555P13(void* arg) {
+        WaveshareEsp32s3TouchLCD43c* board = (WaveshareEsp32s3TouchLCD43c*)arg;
+        bool level = false;
+
+        ESP_LOGI(TAG, "PCA9555 P13 test started - toggling every 1 second");
+
+        while (true) {
+            level = !level;
+            esp_io_expander_set_level(board->pca9555_expander, PCA9555_TEST_PIN, level ? 1 : 0);
+            ESP_LOGD(TAG, "PCA9555 P13 set to: %d", level);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
     }
 
     void InitializeRGB() {
@@ -201,6 +241,7 @@ public:
         InitializeGpio();
         InitializeCodecI2c();
         InitializeCustomio();
+        InitializePca9555();
         InitializeRGB();
         InitializeTouch();
         InitializeTools();

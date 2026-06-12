@@ -9,6 +9,7 @@
 #include "lamp_controller.h"
 #include "led/single_led.h"
 #include "assets/lang_config.h"
+#include "esp_io_expander_pca9555.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
@@ -21,6 +22,11 @@
 
 #define TAG "CompactWifiBoard"
 
+// PCA9555 test pin - P13 (Port 1, Pin 3)
+// PCA9555的7位地址范围是0x20-0x27，用户指定的地址0x40是8位写地址格式
+#define PCA9555_TEST_PIN IO_EXPANDER_PIN_NUM_11
+#define PCA9555_I2C_ADDRESS (0x40 >> 1)  // 转换为7位地址
+
 class CompactWifiBoard : public WifiBoard {
 private:
     i2c_master_bus_handle_t display_i2c_bus_;
@@ -31,6 +37,51 @@ private:
     Button touch_button_;
     Button volume_up_button_;
     Button volume_down_button_;
+    esp_io_expander_handle_t pca9555_expander_ = NULL;
+
+    void InitializePca9555() {
+        ESP_LOGI(TAG, "Initializing PCA9555 IO expander at address 0x%02X...", PCA9555_I2C_ADDRESS);
+        
+        esp_err_t ret = esp_io_expander_new_i2c_pca9555(display_i2c_bus_, PCA9555_I2C_ADDRESS, &pca9555_expander_);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "PCA9555 create returned error: %s", esp_err_to_name(ret));
+            ESP_LOGE(TAG, "Possible causes:");
+            ESP_LOGE(TAG, "1. I2C bus not initialized properly");
+            ESP_LOGE(TAG, "2. PCA9555 not connected or not powered");
+            ESP_LOGE(TAG, "3. Incorrect I2C address (check A0-A2 pins)");
+            ESP_LOGE(TAG, "4. SDA/SCL pins not connected correctly");
+            return;
+        }
+        ESP_LOGI(TAG, "PCA9555 driver created successfully");
+
+        ret = esp_io_expander_set_dir(pca9555_expander_, PCA9555_TEST_PIN, IO_EXPANDER_OUTPUT);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "PCA9555 set dir returned error: %s", esp_err_to_name(ret));
+            return;
+        }
+        ESP_LOGI(TAG, "PCA9555 P13 set as output");
+
+        xTaskCreatePinnedToCore(TestPca9555P13, "PCA9555_Test", 2048, this, 5, NULL, 0);
+        ESP_LOGI(TAG, "PCA9555 test task created");
+    }
+
+    static void TestPca9555P13(void* arg) {
+        CompactWifiBoard* board = (CompactWifiBoard*)arg;
+        bool level = false;
+
+        ESP_LOGI(TAG, "PCA9555 P13 test started - toggling every 1 second");
+
+        while (true) {
+            level = !level;
+            esp_err_t ret = esp_io_expander_set_level(board->pca9555_expander_, PCA9555_TEST_PIN, level ? 1 : 0);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to set PCA9555 P13 level: %s", esp_err_to_name(ret));
+            } else {
+                ESP_LOGI(TAG, "PCA9555 P13 set to: %d", level);
+            }
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
 
     void InitializeDisplayI2c() {
         i2c_master_bus_config_t bus_config = {
@@ -162,6 +213,7 @@ public:
         InitializeSsd1306Display();
         InitializeButtons();
         InitializeTools();
+        InitializePca9555();
     }
 
     virtual Led* GetLed() override {

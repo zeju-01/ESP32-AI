@@ -5,6 +5,7 @@
 #include <driver/gpio.h>
 #include <led_strip.h>
 #include <esp_timer.h>
+#include <freertos/FreeRTOS.h>
 #include <atomic>
 #include <mutex>
 #include <vector>

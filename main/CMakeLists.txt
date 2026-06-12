@@ -1,5 +1,6 @@
 # Define source files
-set(SOURCES "audio/audio_codec.cc"
+set(SOURCES "ctype_stub.c"
+            "audio/audio_codec.cc"
             "audio/audio_service.cc"
             "audio/demuxer/ogg_demuxer.cc"
             "audio/codecs/no_audio_codec.cc"

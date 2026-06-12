@@ -6,26 +6,17 @@
 #define AUDIO_INPUT_SAMPLE_RATE  16000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
-// 如果使用 Duplex I2S 模式，请注释下面一行
-#define AUDIO_I2S_METHOD_SIMPLEX
+// ES8374音频编解码器配置
+#define AUDIO_I2S_GPIO_MCLK     GPIO_NUM_16   // MCLK时钟输出到ES8374
+#define AUDIO_I2S_GPIO_WS       GPIO_NUM_45   // 左右声道选择
+#define AUDIO_I2S_GPIO_BCLK     GPIO_NUM_9    // 位时钟
+#define AUDIO_I2S_GPIO_DIN      GPIO_NUM_8    // 数据输入（从ES8374到ESP32）
+#define AUDIO_I2S_GPIO_DOUT     GPIO_NUM_10   // 数据输出（从ESP32到ES8374）
 
-#ifdef AUDIO_I2S_METHOD_SIMPLEX
-
-#define AUDIO_I2S_MIC_GPIO_WS   GPIO_NUM_1
-#define AUDIO_I2S_MIC_GPIO_SCK  GPIO_NUM_2
-#define AUDIO_I2S_MIC_GPIO_DIN  GPIO_NUM_42
-#define AUDIO_I2S_SPK_GPIO_DOUT GPIO_NUM_39
-#define AUDIO_I2S_SPK_GPIO_BCLK GPIO_NUM_40
-#define AUDIO_I2S_SPK_GPIO_LRCK GPIO_NUM_41
-
-#else
-
-#define AUDIO_I2S_GPIO_WS GPIO_NUM_4
-#define AUDIO_I2S_GPIO_BCLK GPIO_NUM_5
-#define AUDIO_I2S_GPIO_DIN  GPIO_NUM_6
-#define AUDIO_I2S_GPIO_DOUT GPIO_NUM_7
-
-#endif
+#define AUDIO_CODEC_PA_PIN      GPIO_NUM_NC
+#define AUDIO_CODEC_I2C_SDA_PIN GPIO_NUM_17   // ES8374 I2C控制接口SDA（与主I2C复用）
+#define AUDIO_CODEC_I2C_SCL_PIN GPIO_NUM_18   // ES8374 I2C控制接口SCL（与主I2C复用）
+#define AUDIO_CODEC_ES8374_ADDR (0x20 >> 1)   // ES8374 8位地址0x20，转换为7位地址0x10
 
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
@@ -35,31 +26,56 @@
 #define VOLUME_DOWN_BUTTON_GPIO GPIO_NUM_NC
 
 //Camera Config
-#define CAMERA_PIN_D0 GPIO_NUM_11
-#define CAMERA_PIN_D1 GPIO_NUM_9
-#define CAMERA_PIN_D2 GPIO_NUM_8
-#define CAMERA_PIN_D3 GPIO_NUM_10
-#define CAMERA_PIN_D4 GPIO_NUM_12
-#define CAMERA_PIN_D5 GPIO_NUM_18
-#define CAMERA_PIN_D6 GPIO_NUM_17
-#define CAMERA_PIN_D7 GPIO_NUM_16
-#define CAMERA_PIN_XCLK GPIO_NUM_15
-#define CAMERA_PIN_PCLK GPIO_NUM_13
-#define CAMERA_PIN_VSYNC GPIO_NUM_6
-#define CAMERA_PIN_HREF GPIO_NUM_7
-#define CAMERA_PIN_SIOC GPIO_NUM_5
-#define CAMERA_PIN_SIOD GPIO_NUM_4
+#define CAMERA_PIN_D0 GPIO_NUM_13    // 摄像头数据位0
+#define CAMERA_PIN_D1 GPIO_NUM_47    // 摄像头数据位1
+#define CAMERA_PIN_D2 GPIO_NUM_14    // 摄像头数据位2
+#define CAMERA_PIN_D3 GPIO_NUM_3     // 摄像头数据位3
+#define CAMERA_PIN_D4 GPIO_NUM_12    // 摄像头数据位4
+#define CAMERA_PIN_D5 GPIO_NUM_42    // 摄像头数据位5
+#define CAMERA_PIN_D6 GPIO_NUM_41    // 摄像头数据位6
+#define CAMERA_PIN_D7 GPIO_NUM_39    // 摄像头数据位7
+#define CAMERA_PIN_XCLK GPIO_NUM_40  // 摄像头外部时钟
+#define CAMERA_PIN_PCLK GPIO_NUM_11  // 摄像头像素时钟
+#define CAMERA_PIN_VSYNC GPIO_NUM_21 // 摄像头垂直同步
+#define CAMERA_PIN_HREF GPIO_NUM_38  // 摄像头行同步
+#define CAMERA_PIN_SIOC GPIO_NUM_18  // SCCB接口时钟 (I2C SCL)
+#define CAMERA_PIN_SIOD GPIO_NUM_17  // SCCB接口数据 (I2C SDA)
 #define CAMERA_PIN_PWDN GPIO_NUM_NC
 #define CAMERA_PIN_RESET GPIO_NUM_NC
 #define XCLK_FREQ_HZ 20000000
 
 
-#define DISPLAY_BACKLIGHT_PIN GPIO_NUM_38
-#define DISPLAY_MOSI_PIN      GPIO_NUM_20
-#define DISPLAY_CLK_PIN       GPIO_NUM_19
-#define DISPLAY_DC_PIN        GPIO_NUM_47
-#define DISPLAY_RST_PIN       GPIO_NUM_21
-#define DISPLAY_CS_PIN        GPIO_NUM_45
+// 显示屏SPI接口 - 使用PCA9555扩展控制部分引脚
+// #define DISPLAY_BACKLIGHT_PIN GPIO_NUM_38  // 改为PCA9555 P07
+// #define DISPLAY_RST_PIN       GPIO_NUM_21  // 改为PCA9555 P06
+// #define DISPLAY_CS_PIN        GPIO_NUM_45  // 改为PCA9555 P05
+#define DISPLAY_MOSI_PIN      GPIO_NUM_0   // SPI数据输出
+#define DISPLAY_CLK_PIN       GPIO_NUM_1   // SPI时钟
+#define DISPLAY_DC_PIN        GPIO_NUM_2   // 数据/命令选择
+
+// SD卡引脚
+#define SD_DATA_PIN    GPIO_NUM_4
+#define SD_CMD_PIN     GPIO_NUM_7
+#define SD_CLK_PIN     GPIO_NUM_15
+
+// ADC引脚
+#define ADC_PIN        GPIO_NUM_5
+
+// WS2812引脚
+#define WS2812_PIN     GPIO_NUM_48
+
+// PCA9555扩展IO定义
+#define PCA9555_P00_KEY1       0   // 按键1
+#define PCA9555_P01_MOTOR      1   // 马达
+#define PCA9555_P05_DISPLAY_CS 5   // 显示屏片选
+#define PCA9555_P06_DISPLAY_RST 6  // 显示屏复位
+#define PCA9555_P07_BACKLIGHT  7   // 显示屏背光控制
+#define PCA9555_P10_IR_TX      10  // 红外发射
+#define PCA9555_P11_IR_RX      11  // 红外接收
+#define PCA9555_P13_LED        13  // LED
+#define PCA9555_P15_ENCODER_L  15  // 编码开关左
+#define PCA9555_P16_ENCODER_R  16  // 编码开关右
+#define PCA9555_P17_KEY2       17  // 按键2/编码开关按钮
 
 
 #ifdef CONFIG_LCD_ST7789_240X320
