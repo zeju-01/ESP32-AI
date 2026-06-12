@@ -258,8 +258,8 @@ private:
         display_ = new SpiLcdDisplay(panel_io, panel,
                                     320, 172, 0, 34, false, true, true);
         
-        // 开启背光
-        esp_io_expander_set_level(pca9555_expander_, 7, 1); // P07=7
+        // 开启背光（低电平有效）
+        pca9555_set_pin_level_direct(pca9555_expander_, 7, 0); // P07=7 (低电平开启背光)
     }
 
     void InitializeCamera() {
