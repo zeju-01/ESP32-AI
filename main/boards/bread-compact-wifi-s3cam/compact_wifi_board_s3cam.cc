@@ -276,9 +276,11 @@ private:
         config.pin_pclk = CAMERA_PIN_PCLK;
         config.pin_vsync = CAMERA_PIN_VSYNC;
         config.pin_href = CAMERA_PIN_HREF;
-        config.pin_sccb_sda = CAMERA_PIN_SIOD;
-        config.pin_sccb_scl = CAMERA_PIN_SIOC;
-        config.sccb_i2c_port = 0;
+        // 设置pin_sccb_sda为-1，让摄像头驱动使用已初始化的I2C端口
+        // 这样摄像头SCCB会复用主I2C总线（I2C_NUM_0），与PCA9555、ES8374等设备共享
+        config.pin_sccb_sda = -1;
+        config.pin_sccb_scl = -1;
+        config.sccb_i2c_port = I2C_NUM_0;  // 使用主I2C端口
         config.pin_pwdn = CAMERA_PIN_PWDN;
         config.pin_reset = CAMERA_PIN_RESET;
         config.xclk_freq_hz = XCLK_FREQ_HZ;
@@ -381,13 +383,12 @@ public:
     }
 
     virtual Backlight* GetBacklight() override {
-        // 背光由PCA9555的P07控制
+        // 背光由PCA9555的P07控制，在Initialize()中已设置为输出
+        // 这里直接通过PCA9555控制背光，不使用PwmBacklight
         if (pca9555_expander_) {
             esp_io_expander_set_level(pca9555_expander_, 7, 1); // 开启背光 (P07=7)
-            static PwmBacklight backlight(GPIO_NUM_NC, false); // 使用虚拟引脚，实际由PCA9555控制
-            return &backlight;
         }
-        return nullptr;
+        return nullptr;  // 背光由PCA9555直接控制，不使用PwmBacklight
     }
 
     virtual Camera* GetCamera() override {

@@ -16,7 +16,7 @@
 #define AUDIO_CODEC_PA_PIN      GPIO_NUM_NC
 #define AUDIO_CODEC_I2C_SDA_PIN GPIO_NUM_17   // ES8374 I2C控制接口SDA（与主I2C复用）
 #define AUDIO_CODEC_I2C_SCL_PIN GPIO_NUM_18   // ES8374 I2C控制接口SCL（与主I2C复用）
-#define AUDIO_CODEC_ES8374_ADDR (0x20 >> 1)   // ES8374 8位地址0x20，转换为7位地址0x10
+#define AUDIO_CODEC_ES8374_ADDR 0x20          // ES8374 8位地址0x20（驱动内部会自动转换为7位地址）
 
 
 #define BUILTIN_LED_GPIO        GPIO_NUM_48
