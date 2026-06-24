@@ -1,6 +1,7 @@
 #include "audio_service.h"
 #include <esp_log.h>
 #include <cstring>
+#include <cmath>
 
 #define RATE_CVT_CFG(_src_rate, _dest_rate, _channel)        \
     (esp_ae_rate_cvt_cfg_t)                                  \
@@ -260,6 +261,7 @@ void AudioService::AudioInputTask() {
                     }
                     data = std::move(mono_data);
                 }
+
                 PushTaskToEncodeQueue(kAudioTaskTypeEncodeToTestingQueue, std::move(data));
                 continue;
             }
@@ -270,6 +272,25 @@ void AudioService::AudioInputTask() {
             int samples = 160; // 10ms
             std::vector<int16_t> data;
             if (ReadAudioData(data, 16000, samples)) {
+                // 调试：每2.5秒打印一次音频输入统计信息
+                static int debug_count = 0;
+                debug_count++;
+                if (debug_count % 250 == 0) {  // 250 * 10ms = 2.5s
+                    int32_t sum = 0, abs_sum = 0;
+                    int16_t max_val = -32768, min_val = 32767;
+                    for (auto s : data) {
+                        sum += s;
+                        abs_sum += (s >= 0 ? s : -s);
+                        if (s > max_val) max_val = s;
+                        if (s < min_val) min_val = s;
+                    }
+                    int dc_offset = sum / (int)data.size();
+                    int avg_abs = abs_sum / (int)data.size();
+                    ESP_LOGI(TAG, "AudioInput: dc=%d avg_abs=%d max=%d min=%d sz=%d %s",
+                        dc_offset, avg_abs, max_val, min_val, (int)data.size(),
+                        avg_abs < 10 ? "[SILENT!]" : avg_abs > 20000 ? "[CLIPPING!]" : "[OK]");
+                }
+
                 if (bits & AS_EVENT_WAKE_WORD_RUNNING) {
                     wake_word_->Feed(data);
                 }

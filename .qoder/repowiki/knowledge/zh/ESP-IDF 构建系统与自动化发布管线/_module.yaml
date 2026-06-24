@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: build_system
+title: ESP-IDF 构建系统与自动化发布管线
+scope: []
+source_files:
+    - CMakeLists.txt
+    - main/CMakeLists.txt
+    - scripts/release.py
+    - .github/workflows/build.yml
+    - main/boards/bread-compact-wifi/config.json
+depends_on: []
+related_to: []

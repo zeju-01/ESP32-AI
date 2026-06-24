@@ -1,0 +1,29 @@
+schema_version: 1
+module_path: firmware/application_core
+title: 设备应用核心与状态管理
+scope:
+    - main/application.cc
+    - main/application.h
+    - main/main.cc
+    - main/device_state.h
+    - main/device_state_machine.cc
+    - main/device_state_machine.h
+    - main/mcp_server.cc
+    - main/mcp_server.h
+    - main/ota.cc
+    - main/ota.h
+    - main/reminder_manager.cc
+    - main/reminder_manager.h
+    - main/reminder_mcp_tool.cc
+    - main/settings.cc
+    - main/settings.h
+    - main/system_info.cc
+    - main/system_info.h
+    - main/time_parser.cc
+    - main/time_parser.h
+    - main/assets.cc
+    - main/assets.h
+source_files: []
+depends_on: []
+related_to:
+    - path: docs

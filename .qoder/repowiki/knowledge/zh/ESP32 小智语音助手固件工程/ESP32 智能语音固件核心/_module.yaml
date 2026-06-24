@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: firmware
+title: ESP32 智能语音固件核心
+scope:
+    - main/
+source_files: []
+depends_on: []
+related_to: []

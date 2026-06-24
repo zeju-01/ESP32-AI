@@ -1,0 +1,12 @@
+schema_version: 1
+module_path: logging_system
+title: ESP-IDF 原生日志系统应用规范
+scope: []
+source_files:
+    - main/main.cc
+    - main/application.cc
+    - main/boards/common/esp_video.cc
+    - main/display/lvgl_display/jpg/jpeg_to_image.c
+    - sdkconfig.defaults
+depends_on: []
+related_to: []

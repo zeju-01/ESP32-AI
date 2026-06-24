@@ -1,0 +1,15 @@
+schema_version: 1
+module_path: error_handling
+title: ESP-IDF 错误处理与状态反馈机制
+scope: []
+source_files:
+    - main/main.cc
+    - main/application.cc
+    - main/application.h
+    - main/ota.cc
+    - main/protocols/protocol.cc
+    - main/protocols/mqtt_protocol.cc
+    - main/protocols/websocket_protocol.cc
+    - main/audio/audio_service.cc
+depends_on: []
+related_to: []

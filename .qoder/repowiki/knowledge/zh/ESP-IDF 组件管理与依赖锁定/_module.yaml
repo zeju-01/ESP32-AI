@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: dependency_management
+title: ESP-IDF 组件管理与依赖锁定
+scope: []
+source_files:
+    - main/idf_component.yml
+    - dependencies.lock
+    - managed_components/
+    - main/CMakeLists.txt
+depends_on: []
+related_to: []

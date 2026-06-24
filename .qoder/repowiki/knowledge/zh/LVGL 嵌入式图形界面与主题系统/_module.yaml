@@ -1,0 +1,15 @@
+schema_version: 1
+module_path: frontend_style
+title: LVGL 嵌入式图形界面与主题系统
+scope: []
+source_files:
+    - main/display/lvgl_display/lvgl_theme.h
+    - main/display/lvgl_display/lvgl_theme.cc
+    - main/display/lvgl_display/lvgl_display.cc
+    - main/display/lvgl_display/robot_face.cc
+    - main/display/lvgl_display/emoji_collection.cc
+    - managed_components/lvgl__lvgl/lvgl.h
+    - managed_components/espressif__esp_lvgl_port/include/esp_lvgl_port.h
+    - scripts/Image_Converter/LVGLImage.py
+depends_on: []
+related_to: []

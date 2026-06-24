@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: configuration_system
+title: ESP-IDF 配置系统：Kconfig、NVS 与 OTA 动态下发
+scope: []
+source_files:
+    - main/settings.h
+    - main/settings.cc
+    - main/Kconfig.projbuild
+    - main/ota.cc
+    - sdkconfig.defaults
+    - main/boards/common/board.cc
+depends_on: []
+related_to: []

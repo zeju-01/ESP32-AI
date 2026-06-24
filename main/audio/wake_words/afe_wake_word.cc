@@ -76,6 +76,7 @@ bool AfeWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list) {
     afe_config->afe_perferred_core = 1;
     afe_config->afe_perferred_priority = 1;
     afe_config->memory_alloc_mode = AFE_MEMORY_ALLOC_MORE_PSRAM;
+    afe_config->agc_init = false;  // 禁用AGC，避免将噪声放大到满量程导致VAD误判
     
     afe_iface_ = esp_afe_handle_from_config(afe_config);
     afe_data_ = afe_iface_->create_from_config(afe_config);
@@ -138,6 +139,7 @@ void AfeWakeWord::AudioDetectionTask() {
     ESP_LOGI(TAG, "Audio detection task started, feed size: %d fetch size: %d",
         feed_size, fetch_size);
 
+    int fetch_count = 0;
     while (true) {
         xEventGroupWaitBits(event_group_, DETECTION_RUNNING_EVENT, pdFALSE, pdTRUE, portMAX_DELAY);
 
@@ -149,7 +151,19 @@ void AfeWakeWord::AudioDetectionTask() {
         // Store the wake word data for voice recognition, like who is speaking
         StoreWakeWordData(res->data, res->data_size / sizeof(int16_t));
 
+        // 调试：每2秒打印AFE状态（fetch chunksize≈32ms，60*32ms≈2s）
+        fetch_count++;
+        if (fetch_count % 60 == 0) {
+            ESP_LOGI(TAG, "AFE: vad=%s vol=%.1fdB wakeup=%d ringbuff_free=%.0f%%",
+                res->vad_state == 1 ? "SPEECH" : "SILENCE",
+                res->data_volume,
+                res->wakeup_state,
+                res->ringbuff_free_pct * 100);
+        }
+
         if (res->wakeup_state == WAKENET_DETECTED) {
+            ESP_LOGI(TAG, "Wake word detected: %s (model_index=%d)",
+                wake_words_[res->wakenet_model_index - 1].c_str(), res->wakenet_model_index);
             Stop();
             last_detected_wake_word_ = wake_words_[res->wakenet_model_index - 1];
 

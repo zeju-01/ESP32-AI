@@ -13,6 +13,7 @@
 #include "time_parser.h"
 
 #include <cstring>
+#include <cmath>
 #include <esp_log.h>
 #include <cJSON.h>
 #include <driver/gpio.h>
@@ -364,6 +365,9 @@ void Application::ActivationTask() {
     // Create OTA object for activation process
     ota_ = std::make_unique<Ota>();
 
+    // 在激活流程开始前就启用唤醒词检测，让用户可以用"你好小智"唤醒设备
+    audio_service_.EnableWakeWordDetection(true);
+
     // Check for new assets version
     CheckAssetsVersion();
 
@@ -436,12 +440,13 @@ void Application::CheckAssetsVersion() {
 }
 
 void Application::CheckNewVersion() {
-    const int MAX_RETRY = 10;
+    const int MAX_RETRY = 3;  // 减少重试次数
     int retry_count = 0;
-    int retry_delay = 10; // Initial retry delay in seconds
+    int retry_delay = 5; // 初始延迟缩短为5秒
 
     auto& board = Board::GetInstance();
-    while (true) {
+    bool version_check_ok = false;
+    while (!version_check_ok) {
         auto display = board.GetDisplay();
         display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
 
@@ -449,8 +454,8 @@ void Application::CheckNewVersion() {
         if (err != ESP_OK) {
             retry_count++;
             if (retry_count >= MAX_RETRY) {
-                ESP_LOGE(TAG, "Too many retries, exit version check");
-                return;
+                ESP_LOGW(TAG, "Too many retries, skip version check");
+                break;
             }
 
             char error_message[128];
@@ -466,33 +471,33 @@ void Application::CheckNewVersion() {
                     break;
                 }
             }
-            retry_delay *= 2; // Double the retry delay
+            retry_delay = std::min(retry_delay * 2, 15); // 限制最大延迟为15秒
             continue;
         }
+        version_check_ok = true;
         retry_count = 0;
-        retry_delay = 10; // Reset retry delay
+        retry_delay = 10;
 
         if (ota_->HasNewVersion()) {
             if (UpgradeFirmware(ota_->GetFirmwareUrl(), ota_->GetFirmwareVersion())) {
-                return; // This line will never be reached after reboot
+                return;
             }
-            // If upgrade failed, continue to normal operation
         }
 
-        // No new version, mark the current version as valid
         ota_->MarkCurrentVersionValid();
         if (!ota_->HasActivationCode() && !ota_->HasActivationChallenge()) {
-            // Exit the loop if done checking new version
             break;
         }
+    }
 
+    // 激活流程（无论版本检查是否成功都执行）
+    auto display = board.GetDisplay();
+    if (ota_->HasActivationCode()) {
         display->SetStatus(Lang::Strings::ACTIVATION);
-        // Activation code is shown to the user and waiting for the user to input
-        if (ota_->HasActivationCode()) {
-            ShowActivationCode(ota_->GetActivationCode(), ota_->GetActivationMessage());
-        }
+        ShowActivationCode(ota_->GetActivationCode(), ota_->GetActivationMessage());
+    }
 
-        // This will block the loop until the activation is done or timeout
+    if (ota_->HasActivationCode() || ota_->HasActivationChallenge()) {
         for (int i = 0; i < 10; ++i) {
             ESP_LOGI(TAG, "Activating... %d/%d", i + 1, 10);
             esp_err_t err = ota_->Activate();
